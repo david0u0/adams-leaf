@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::cell::RefCell;
 
 use crate::network_struct::Graph;
-use crate::algos::{*};
+use crate::algos::{StreamAwareGraph, RouteTable, Flow,RoutingAlgo};
 use crate::algos::cost_estimate;
 
 fn f64_eq(a: f64, b: f64) -> bool {
@@ -11,7 +11,7 @@ fn f64_eq(a: f64, b: f64) -> bool {
 
 type DistStruct = (f64, Vec<i32>);
 pub struct RO {
-    g: Graph,
+    g: StreamAwareGraph,
     final_dist_map: HashMap<(i32, i32), RefCell<DistStruct>>,
     tt_table: RouteTable,
     avb_table: RouteTable,
@@ -69,7 +69,7 @@ impl RO {
             }
         }
     }
-    fn recursive_get_route(&self, src_id: i32, dst_id: i32,
+    fn _recursive_get_route(&self, src_id: i32, dst_id: i32,
         route: &mut Vec<i32>, all_routes: &mut Vec<Vec<i32>>
     ) {
         route.push(dst_id);
@@ -79,23 +79,21 @@ impl RO {
         } else {
             if let Some(rc_dist) = self.final_dist_map.get(&(src_id, dst_id)) {
                 for &prev_id in rc_dist.borrow().1.iter() {
-                    self.recursive_get_route(src_id, prev_id, route, all_routes);
+                    self._recursive_get_route(src_id, prev_id, route, all_routes);
                 }
             }
         }
         route.pop();
     }
-    fn get_cost_fn(&self, route: &Vec<i32>) {
-    }
-    fn get_single_route(&self, src_id: i32, dst_id: i32) -> Vec<i32> {
+    pub fn get_multi_routes(&self, src_id: i32, dst_id: i32) -> Vec<Vec<i32>> {
         let mut all_routes: Vec<Vec<i32>> = vec![];
-        self.recursive_get_route(src_id, dst_id, &mut vec![], &mut all_routes);
-        return all_routes[0].clone();
+        self._recursive_get_route(src_id, dst_id, &mut vec![], &mut all_routes);
+        return all_routes;
     }
 }
 
-impl RoutingAlgo for RO {
-    fn new(g: Graph) -> Self {
+impl RoutingAlgo<StreamAwareGraph> for RO {
+    fn new(g: StreamAwareGraph) -> Self {
         return RO {
             g,
             final_dist_map: HashMap::new(),
@@ -109,13 +107,13 @@ impl RoutingAlgo for RO {
             match flow {
                 Flow::AVB(flow) => {
                     self.dijkstra(flow.src);
-                    let r = self.get_single_route(flow.src, flow.dst);
-                    self.avb_table.insert(flow.id, (flow, Some(r)));
+                    let r = self.get_multi_routes(flow.src, flow.dst);
+                    self.avb_table.insert(flow.id, (flow, Some(r[0].clone())));
                 },
                 Flow::TT(flow) => {
                     self.dijkstra(flow.src);
-                    let r = self.get_single_route(flow.src, flow.dst);
-                    self.tt_table.insert(flow.id, (flow, Some(r)));
+                    let r = self.get_multi_routes(flow.src, flow.dst);
+                    self.tt_table.insert(flow.id, (flow, Some(r[0].clone())));
                 },
             }
         }

@@ -1,5 +1,5 @@
-use crate::algos::{Graph, Flow, FlowStruct, RouteTable};
+use crate::algos::{Graph, Flow, FlowStruct, RouteTable, StreamAwareGraph};
 
-pub fn estimate(g: &Graph, tt_table: RouteTable, avb_table: RouteTable) {
+pub fn estimate(g: &impl Graph, tt_table: RouteTable, avb_table: RouteTable) {
     
 }

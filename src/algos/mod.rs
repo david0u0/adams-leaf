@@ -14,14 +14,17 @@ pub enum Flow {
     TT(FlowStruct),
 }
 
-pub trait RoutingAlgo {
-    fn new(g: Graph) -> Self;
+pub trait RoutingAlgo<G: Graph> {
+    fn new(g: G) -> Self;
     fn compute_routes(&mut self, flows: Vec<Flow>);
     fn get_retouted_flows(&self) -> Vec<i32>;
     fn get_route(&self, id: i32) -> Vec<i32>;
 }
 
 pub type RouteTable = HashMap<i32, (FlowStruct, Option<Vec<i32>>)>;
+
+mod stream_aware_graph;
+pub use stream_aware_graph::StreamAwareGraph;
 
 mod dijkstra;
 pub use dijkstra::Dijkstra;

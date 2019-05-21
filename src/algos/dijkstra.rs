@@ -3,7 +3,7 @@ use std::cell::RefCell;
 
 use crate::network_struct::Graph;
 use crate::algos::RoutingAlgo;
-use crate::algos::{Flow, FlowStruct};
+use crate::algos::{Flow, FlowStruct, StreamAwareGraph};
 
 fn f64_eq(a: f64, b: f64) -> bool {
     return (a - b).abs() < 0.0001;
@@ -11,7 +11,7 @@ fn f64_eq(a: f64, b: f64) -> bool {
 
 type DistStruct = (f64, Vec<i32>);
 pub struct Dijkstra {
-    g: Graph,
+    g: StreamAwareGraph,
     final_dist_map: HashMap<(i32, i32), RefCell<DistStruct>>,
     tt_table: HashMap<i32, FlowStruct>,
     avb_table: HashMap<i32, FlowStruct>
@@ -82,8 +82,8 @@ impl Dijkstra {
     }
 }
 
-impl RoutingAlgo for Dijkstra {
-    fn new(g: Graph) -> Self {
+impl RoutingAlgo<StreamAwareGraph> for Dijkstra {
+    fn new(g: StreamAwareGraph) -> Self {
         return Dijkstra {
             g,
             final_dist_map: HashMap::new(),
