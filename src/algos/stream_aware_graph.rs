@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::collections::HashMap;
 
 use crate::network_struct::Graph;
@@ -10,11 +8,11 @@ enum NodeType {
 }
 struct Node {
     node_type: NodeType,
-    edges: HashMap<i32, (f64, bool, Rc<RefCell<Node>>)>
+    edges: HashMap<i32, (f64, bool)>
 }
 
 pub struct StreamAwareGraph {
-    map: HashMap<i32, Rc<RefCell<Node>>>,
+    map: HashMap<i32, Node>,
     node_cnt: usize,
     edge_cnt: usize,
     next_node_id: i32,
@@ -36,15 +34,14 @@ impl StreamAwareGraph {
             node_type,
             edges: HashMap::new(),
         };
-        self.map.insert(id, Rc::new(RefCell::new(node)));
+        self.map.insert(id, node);
         return id;
     }
     fn _add_single_edge(&mut self, id_pair: (i32, i32), bandwidth: f64) {
         assert_ne!(id_pair.0, id_pair.1);
-        if let Some(rc_node) = self.map.get(&id_pair.0) {
-            let mut node = rc_node.borrow_mut();
-            if let Some(rc_next) = self.map.get(&id_pair.1) {
-                let edge = (bandwidth, true, rc_next.clone());
+        if self.map.contains_key(&id_pair.1) {
+            if let Some(node) = self.map.get_mut(&id_pair.0) {
+                let edge = (bandwidth, true);
                 node.edges.insert(id_pair.1, edge);
                 return;
             }
@@ -52,8 +49,7 @@ impl StreamAwareGraph {
         panic!("加入邊的時候發現邊或節點不存在");
     }
     fn _del_single_edge(&mut self, id_pair: (i32, i32)) -> f64 {
-        if let Some(rc_node) = self.map.get(&id_pair.0) {
-            let mut node = rc_node.borrow_mut();
+        if let Some(node) = self.map.get_mut(&id_pair.0) {
             if let Some(e) = node.edges.remove(&id_pair.1) {
                 return e.0;
             }
@@ -62,8 +58,7 @@ impl StreamAwareGraph {
     }
 
     fn _change_edge_active(&mut self, id_pair: (i32, i32), active: bool) {
-        if let Some(rc_node) = self.map.get(&id_pair.0) {
-            let mut node = rc_node.borrow_mut();
+        if let Some(node) = self.map.get_mut(&id_pair.0) {
             if let Some(e) = node.edges.get_mut(&id_pair.1) {
                 e.1 = active;
                 return;
@@ -106,8 +101,7 @@ impl Graph for StreamAwareGraph {
         return t;
     }
     fn del_node(&mut self, id: i32) -> bool {
-        if let Some(rc_node) = self.map.remove(&id) {
-            let node = rc_node.borrow();
+        if let Some(node) = self.map.remove(&id) {
             for (&next_id, _edge) in node.edges.iter() {
                 self.del_edge((next_id, id));
             }
@@ -117,16 +111,16 @@ impl Graph for StreamAwareGraph {
         return false;
     }
     fn foreach_edge(&self, id: i32, mut callback: impl FnMut(i32, f64) -> ()) {
-        let node = self.map.get(&id).unwrap().borrow();
-        for (id, (bandwidth, active, _)) in node.edges.iter() {
+        let node = self.map.get(&id).unwrap();
+        for (id, (bandwidth, active)) in node.edges.iter() {
             if *active {
                 callback(*id, *bandwidth);
             }
         }
     }
     fn foreach_node(&self, mut callback: impl FnMut(i32, bool) -> ()) {
-        for (&id, rc_node) in self.map.iter() {
-            match rc_node.borrow().node_type {
+        for (&id, node) in self.map.iter() {
+            match node.node_type {
                 NodeType::Host => {
                     callback(id, false);
                 },

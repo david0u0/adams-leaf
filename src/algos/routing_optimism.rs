@@ -39,9 +39,10 @@ impl RO {
                 let next_pair = (src_id, next_id);
                 let next_dist = cur_dist + 1.0 / (bandwidth as f64);
                 if let Some(rc_entry) = self.final_dist_map.get(&next_pair) {
-                    let entry = rc_entry.borrow_mut();
+                    let mut entry = rc_entry.borrow_mut();
                     if f64_eq(entry.0, next_dist) {
-                        //entry.1.push(cur_id);
+                        // NOTE: 到底會不會進到這裡？
+                        entry.1.push(cur_id);
                     }
                 } else if let Some(entry) = tmp_dist_map.get_mut(&next_id) {
                     if f64_eq(entry.0, next_dist) {
