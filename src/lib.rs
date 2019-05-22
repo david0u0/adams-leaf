@@ -4,7 +4,7 @@ pub mod algos;
 #[cfg(test)]
 mod test {
     use crate::network_struct::Graph;
-    use crate::algos::{RO, RoutingAlgo, Flow, FlowStruct, StreamAwareGraph};
+    use crate::algos::{RO, Dijkstra, RoutingAlgo, Flow, FlowStruct, StreamAwareGraph};
     fn assert_noneorder_vec(mut v1: Vec<Vec<i32>>, mut v2: Vec<Vec<i32>>) {
         v1.sort();
         v2.sort();
@@ -23,7 +23,7 @@ mod test {
         let flow = Flow::AVB(FlowStruct {
             id: 0, src: 0, dst: 2, size: 100, period: 10, max_delay: 10
         });
-        let mut algo = RO::new(g);
+        let mut algo = Dijkstra::new(g);
         algo.compute_routes(vec![flow]);
         let v = algo.get_multi_routes(0, 2);
         assert_noneorder_vec(vec![vec![0, 1, 2], vec![0 ,2]], v);
@@ -52,7 +52,7 @@ mod test {
         let flow = Flow::AVB(FlowStruct {
             id: 0, src: 0, dst: 1, size: 100, period: 10, max_delay: 10
         });
-        let mut algo = RO::new(g);
+        let mut algo = Dijkstra::new(g);
         algo.compute_routes(vec![flow]);
         let v = algo.get_multi_routes(0, 1);
         assert_noneorder_vec(v, vec![

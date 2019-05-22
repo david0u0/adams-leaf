@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 use std::cell::RefCell;
+use std::collections::BinaryHeap;
 
 use crate::network_struct::Graph;
-use crate::algos::{StreamAwareGraph, RouteTable, Flow,RoutingAlgo};
+use crate::algos::{StreamAwareGraph, RouteTable, Flow, RoutingAlgo};
+use crate::algos::util;
 use crate::algos::cost_estimate;
 
 fn f64_eq(a: f64, b: f64) -> bool {
@@ -37,7 +39,7 @@ impl RO {
 
             self.g.foreach_edge(cur_id, |next_id, bandwidth| {
                 let next_pair = (src_id, next_id);
-                let next_dist = cur_dist + 1.0 / (bandwidth as f64);
+                let next_dist = cur_dist + 1.0 / bandwidth;
                 if let Some(rc_entry) = self.final_dist_map.get(&next_pair) {
                     let mut entry = rc_entry.borrow_mut();
                     if f64_eq(entry.0, next_dist) {

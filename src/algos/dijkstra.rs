@@ -3,21 +3,21 @@ use std::cell::RefCell;
 
 use crate::network_struct::Graph;
 use crate::algos::RoutingAlgo;
-use crate::algos::{Flow, FlowStruct, StreamAwareGraph};
+use crate::algos::{Flow, FlowStruct};
 
 fn f64_eq(a: f64, b: f64) -> bool {
     return (a - b).abs() < 0.0001;
 }
 
 type DistStruct = (f64, Vec<i32>);
-pub struct Dijkstra {
-    g: StreamAwareGraph,
+pub struct Dijkstra<G: Graph> {
+    g: G,
     final_dist_map: HashMap<(i32, i32), RefCell<DistStruct>>,
     tt_table: HashMap<i32, FlowStruct>,
     avb_table: HashMap<i32, FlowStruct>
 }
 
-impl Dijkstra {
+impl <G: Graph> Dijkstra<G> {
     fn dijkstra(&mut self, src_id: i32) {
         let mut cur_id = src_id;
         let mut cur_dist = 0.0;
@@ -64,7 +64,7 @@ impl Dijkstra {
             }
         }
     }
-    fn recursive_get_route(&self, src_id: i32, dst_id: i32,
+    fn _recursive_get_route(&self, src_id: i32, dst_id: i32,
         route: &mut Vec<i32>, all_routes: &mut Vec<Vec<i32>>
     ) {
         route.push(dst_id);
@@ -74,16 +74,21 @@ impl Dijkstra {
         } else {
             if let Some(rc_dist) = self.final_dist_map.get(&(src_id, dst_id)) {
                 for &prev_id in rc_dist.borrow().1.iter() {
-                    self.recursive_get_route(src_id, prev_id, route, all_routes);
+                    self._recursive_get_route(src_id, prev_id, route, all_routes);
                 }
             }
         }
         route.pop();
     }
+    pub fn get_multi_routes(&self, src_id: i32, dst_id: i32) -> Vec<Vec<i32>> {
+        let mut all_routes: Vec<Vec<i32>> = vec![];
+        self._recursive_get_route(src_id, dst_id, &mut vec![], &mut all_routes);
+        return all_routes;
+    }
 }
 
-impl RoutingAlgo<StreamAwareGraph> for Dijkstra {
-    fn new(g: StreamAwareGraph) -> Self {
+impl <G: Graph> RoutingAlgo<G> for Dijkstra<G> {
+    fn new(g: G) -> Self {
         return Dijkstra {
             g,
             final_dist_map: HashMap::new(),
@@ -109,12 +114,11 @@ impl RoutingAlgo<StreamAwareGraph> for Dijkstra {
         panic!("Not implemented!");
     }
     fn get_route(&self, id: i32) -> Vec<i32> {
-        let mut all_routes: Vec<Vec<i32>> = vec![];
         if let Some(flow) = self.tt_table.get(&id) {
-            self.recursive_get_route(flow.src, flow.dst, &mut vec![], &mut all_routes);
+            return self.get_multi_routes(flow.src, flow.dst)[0].clone();
         } else if let Some(flow) = self.avb_table.get(&id) {
-            self.recursive_get_route(flow.src, flow.dst, &mut vec![], &mut all_routes);
+            return self.get_multi_routes(flow.src, flow.dst)[0].clone();
         }
-        return all_routes[0].clone();
+        panic!("查找資料流時發現其尚未被排程");
     }
 }
