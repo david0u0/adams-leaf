@@ -28,6 +28,7 @@ impl <P: PartialOrd, K: Hash+Copy+Eq, V> MyMinHeap<P, K, V> {
         self.vec.swap(i1, i2);
     }
     fn justify_heap(&mut self, index: usize) -> Justify {
+        assert!(index < self.vec.len(), "MyMinHeap: 超出陣列範圍");
         let root = &self.vec[index];
         if index * 2 + 1 < self.vec.len() {
             let left = &self.vec[index * 2 + 1];
@@ -51,33 +52,37 @@ impl <P: PartialOrd, K: Hash+Copy+Eq, V> MyMinHeap<P, K, V> {
         let mut index = self.vec.len();
         self.vec.push(Box::new((id, priority, value)));
         self.table.insert(id, index);
-        loop {
-            if index > 0 {
-                index = (index - 1) / 2;
-            }
+        while index > 0 {
+            index = (index - 1) / 2;
             if let Justify::Root = self.justify_heap(index) {
                 break;
             }
         }
     }
-    pub fn pop(&mut self) -> (K, P, V) {
+    pub fn pop(&mut self) -> Option<(K, P, V)> {
+        if self.vec.len() == 0 {
+            return None;
+        }
         let head = &self.vec[0];
         let tail = &self.vec[self.vec.len()-1];
         self.table.remove(&head.0);
         self.swap(self.vec.len() - 1, tail.0, 0, None);
         let ret = self.vec.pop().unwrap();
         let mut index = 0;
-        loop {
+        while index < self.vec.len() {
             match self.justify_heap(index) {
                 Justify::Root => break,
                 Justify::Left => index = index * 2 + 1,
                 Justify::Right => index = index * 2,
             }
         }
-        return *ret;
+        return Some(*ret);
     }
     pub fn contains_key(&self, id: K) -> bool {
         return self.table.contains_key(&id);
+    }
+    pub fn len(&self) -> usize {
+        return self.vec.len();
     }
     pub fn decrease_priority(&mut self, id: K, new_priority: P) {
         assert!(self.contains_key(id), "MyMinHeap: 欲修改不存在鍵的權重");
@@ -98,6 +103,14 @@ impl <P: PartialOrd, K: Hash+Copy+Eq, V> MyMinHeap<P, K, V> {
     pub fn peak(&self) -> &(K, P, V) {
         return &self.vec[0];
     }
+    pub fn get(&self, id: K) -> Option<(&P, &V)> {
+        if self.contains_key(id) {
+            let index = *self.table.get(&id).unwrap();
+            return Some((&self.vec[index].1, &self.vec[index].2));
+        } else {
+            return None;
+        }
+    }
 }
 
 
@@ -115,7 +128,7 @@ mod test {
         let contains_3 = heap.contains_key(3); 
         assert_eq!(true, contains_3);
 
-        assert_eq!(heap.pop(), (3, 1.0, 30));
+        assert_eq!(heap.pop().unwrap(), (3, 1.0, 30));
         let contains_3 = heap.contains_key(3); 
         assert_eq!(false, contains_3);
 
@@ -128,9 +141,9 @@ mod test {
         let contains_4 = heap.contains_key(4); 
         assert_eq!(true, contains_4);
 
-        assert_eq!(heap.pop(), (4, 0.0, 40));
-        assert_eq!(heap.pop(), (2, 2.0, 20));
-        assert_eq!(heap.pop(), (5, 2.1, 50));
+        assert_eq!(heap.pop().unwrap(), (4, 0.0, 40));
+        assert_eq!(heap.pop().unwrap(), (2, 2.0, 20));
+        assert_eq!(heap.pop().unwrap(), (5, 2.1, 50));
     }
     #[test]
     fn test_push_pop_peak_decrease() {
@@ -141,10 +154,10 @@ mod test {
 
         assert_eq!(*heap.peak(), (3, 1.0, 30));
         heap.decrease_priority(1, 0.5);
-        assert_eq!(heap.pop(), (1, 0.5, 10));
+        assert_eq!(heap.pop().unwrap(), (1, 0.5, 10));
 
         assert_eq!(*heap.peak(), (3, 1.0, 30));
         heap.decrease_priority(2, 0.5);
-        assert_eq!(heap.pop(), (2, 0.5, 20));
+        assert_eq!(heap.pop().unwrap(), (2, 0.5, 20));
     }
 }

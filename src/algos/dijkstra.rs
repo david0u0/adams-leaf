@@ -41,7 +41,7 @@ impl <G: Graph> Dijkstra<G> {
                 } else if let Some(entry) = tmp_dist_map.get_mut(&next_id) {
                     if f64_eq(entry.0, next_dist) {
                         entry.1.push(cur_id);
-                    } else {
+                    } else if entry.0 > next_dist {
                         tmp_dist_map.insert(next_id, (next_dist, vec![cur_id]));
                     }
                 } else {

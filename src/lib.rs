@@ -52,7 +52,7 @@ mod test {
         let flow = Flow::AVB(FlowStruct {
             id: 0, src: 0, dst: 1, size: 100, period: 10, max_delay: 10
         });
-        let mut algo = Dijkstra::new(g);
+        let mut algo = RO::new(g);
         algo.compute_routes(vec![flow]);
         let v = algo.get_multi_routes(0, 1);
         assert_noneorder_vec(v, vec![

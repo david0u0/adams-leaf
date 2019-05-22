@@ -1,20 +1,19 @@
 use std::collections::HashMap;
 use std::cell::RefCell;
-use std::collections::BinaryHeap;
 
 use crate::network_struct::Graph;
 use crate::algos::{StreamAwareGraph, RouteTable, Flow, RoutingAlgo};
-use crate::algos::util;
+use crate::algos::util::MyMinHeap;
 use crate::algos::cost_estimate;
 
 fn f64_eq(a: f64, b: f64) -> bool {
     return (a - b).abs() < 0.0001;
 }
 
-type DistStruct = (f64, Vec<i32>);
+type BackTraceStruct = RefCell<Vec<i32>>;
 pub struct RO {
     g: StreamAwareGraph,
-    final_dist_map: HashMap<(i32, i32), RefCell<DistStruct>>,
+    final_dist_map: HashMap<(i32, i32), (f64, BackTraceStruct)>,
     tt_table: RouteTable,
     avb_table: RouteTable,
     routed_node_table: HashMap<i32, bool>
@@ -26,50 +25,33 @@ impl RO {
             return;
         }
         self.routed_node_table.insert(src_id, true);
-        let mut cur_id = src_id;
-        let mut cur_dist = 0.0;
-        let mut tmp_dist_map: HashMap<i32, DistStruct> = HashMap::new();
-        self.final_dist_map.insert((src_id, src_id), RefCell::new((0.0, vec![])));
-        loop {
-            let cur_pair = (src_id, cur_id);
-            // 塞進最終 dist map，並從暫存 dist map 中移除
-            if let Some(entry) = tmp_dist_map.remove(&cur_id) {
-                self.final_dist_map.insert(cur_pair, RefCell::new(entry));
-            }
+        let mut min_heap: MyMinHeap<f64, i32, BackTraceStruct> = MyMinHeap::new();
+        min_heap.push( src_id, 0.0, RefCell::new(vec![]) );
+
+        // 從優先權佇列中移除，並塞進最終 dist map
+        while let Some((cur_id, cur_dist, backtrace)) = min_heap.pop() {
+            self.final_dist_map.insert((src_id, cur_id),
+                (cur_dist, backtrace));
 
             self.g.foreach_edge(cur_id, |next_id, bandwidth| {
                 let next_pair = (src_id, next_id);
                 let next_dist = cur_dist + 1.0 / bandwidth;
-                if let Some(rc_entry) = self.final_dist_map.get(&next_pair) {
-                    let mut entry = rc_entry.borrow_mut();
+                if let Some(entry) = self.final_dist_map.get(&next_pair) {
                     if f64_eq(entry.0, next_dist) {
                         // NOTE: 到底會不會進到這裡？
-                        entry.1.push(cur_id);
+                        entry.1.borrow_mut().push(cur_id);
                     }
-                } else if let Some(entry) = tmp_dist_map.get_mut(&next_id) {
-                    if f64_eq(entry.0, next_dist) {
-                        entry.1.push(cur_id);
-                    } else {
-                        tmp_dist_map.insert(next_id, (next_dist, vec![cur_id]));
+                } else if let Some((og_dist, backtrace)) = min_heap.get(next_id) {
+                    if f64_eq(*og_dist, next_dist) {
+                        backtrace.borrow_mut().push(cur_id);
+                    } else if *og_dist > next_dist {
+                        backtrace.borrow_mut().push(cur_id);
+                        min_heap.decrease_priority(next_id, next_dist);
                     }
                 } else {
-                    tmp_dist_map.insert(next_id, (next_dist, vec![cur_id]));
+                    min_heap.push(next_id, next_dist, RefCell::new(vec![cur_id]));
                 }
             });
-
-            let mut found = false;
-            let mut min = std::f64::MAX;
-            for (id, entry) in tmp_dist_map.iter() {
-                if entry.0 < min {
-                    found = true;
-                    min = entry.0;
-                    cur_dist = min;
-                    cur_id = *id;
-                }
-            }
-            if !found {
-                break;
-            }
         }
     }
     fn _recursive_get_route(&self, src_id: i32, dst_id: i32,
@@ -80,8 +62,8 @@ impl RO {
             let route: Vec<i32> = route.iter().rev().map(|x| *x).collect();
             all_routes.push(route);
         } else {
-            if let Some(rc_dist) = self.final_dist_map.get(&(src_id, dst_id)) {
-                for &prev_id in rc_dist.borrow().1.iter() {
+            if let Some((_, backtrace)) = self.final_dist_map.get(&(src_id, dst_id)) {
+                for &prev_id in backtrace.borrow().iter() {
                     self._recursive_get_route(src_id, prev_id, route, all_routes);
                 }
             }
