@@ -29,6 +29,5 @@ fn main() {
         });
         let mut algo = RO::new(g);
         algo.compute_routes(vec![flow]);
-        return;
         let v = algo.get_multi_routes(0, 1);
 }

@@ -1,7 +1,8 @@
 pub mod network_struct;
 pub mod algos;
+pub mod util;
 
-#[cfg(test)]
+#[cfg(none)]
 mod test {
     use crate::network_struct::Graph;
     use crate::algos::{RO, Dijkstra, RoutingAlgo, Flow, FlowStruct, StreamAwareGraph};

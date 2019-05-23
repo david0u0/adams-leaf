@@ -3,8 +3,8 @@ use std::cell::RefCell;
 
 use crate::network_struct::Graph;
 use crate::algos::{StreamAwareGraph, RouteTable, Flow, RoutingAlgo};
-use crate::algos::util::MyMinHeap;
 use crate::algos::cost_estimate;
+use crate::util::MyMinHeap;
 
 fn f64_eq(a: f64, b: f64) -> bool {
     return (a - b).abs() < 0.0001;

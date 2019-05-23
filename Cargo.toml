@@ -12,5 +12,5 @@ name = "adams_lib"
 path = "src/lib.rs"
 
 [[bin]]
-name = "adams_bin"
-path = "src/bin.rs"
+name = "adams_leaf"
+path = "src/main.rs"

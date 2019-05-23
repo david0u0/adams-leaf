@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::network_struct::Graph;
 
+#[derive(Copy, Clone)]
 enum NodeType {
     Host,
     Switch,
@@ -10,6 +11,18 @@ struct Node {
     node_type: NodeType,
     edges: HashMap<i32, (f64, bool)>
 }
+impl Clone for Node {
+    fn clone(&self) -> Self {
+        let mut edges: HashMap<i32, (f64, bool)> = HashMap::new();
+        for (&id, &edge) in self.edges.iter() {
+            edges.insert(id, edge);
+        }
+        return Node {
+            node_type: self.node_type.clone(),
+            edges
+        }
+    }
+}
 
 pub struct StreamAwareGraph {
     map: HashMap<i32, Node>,
@@ -17,7 +30,6 @@ pub struct StreamAwareGraph {
     edge_cnt: usize,
     next_node_id: i32,
 }
-
 impl StreamAwareGraph {
     fn _add_node(&mut self, is_switch: bool) -> i32 {
         let node_type = {
@@ -74,9 +86,7 @@ impl StreamAwareGraph {
         self._change_edge_active(id_pair, false);
         self._change_edge_active((id_pair.1, id_pair.0), false);
     }
-}
-impl Graph for StreamAwareGraph {
-    fn new() -> Self {
+    pub fn new() -> Self {
         return StreamAwareGraph {
             map: HashMap::new(),
             node_cnt: 0,
@@ -84,6 +94,8 @@ impl Graph for StreamAwareGraph {
             next_node_id: 0,
         };
     }
+}
+impl Graph for StreamAwareGraph {
     fn add_host(&mut self) -> i32 {
         return self._add_node(false);
     }
@@ -128,6 +140,21 @@ impl Graph for StreamAwareGraph {
                     callback(id, true);
                 }
             }
+        }
+    }
+}
+
+impl Clone for StreamAwareGraph {
+    fn clone(&self) -> Self {
+        let mut map: HashMap<i32, Node> = HashMap::new();
+        for (&id, node) in self.map.iter() {
+            map.insert(id, node.clone());
+        }
+        return StreamAwareGraph {
+            map,
+            node_cnt: self.node_cnt,
+            edge_cnt: self.edge_cnt,
+            next_node_id: self.next_node_id,
         }
     }
 }
