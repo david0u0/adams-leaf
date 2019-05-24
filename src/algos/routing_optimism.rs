@@ -29,7 +29,7 @@ impl <'a> RO<'a> {
 impl <'a> RoutingAlgo for RO<'a> {
     fn compute_routes(&mut self, flows: Vec<Flow>) {
         for flow in flows.into_iter() {
-            if let Flow::AVB { id, src, dst,  .. } = flow {
+            if let Flow::AVB { id, src, dst, .. } = flow {
                 let r = self.dijkstra_algo.get_route(src, dst);
                 self.route_table.insert(id, (flow, r));
             } else if let Flow::TT { id, src, dst, .. } = flow {

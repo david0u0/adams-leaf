@@ -3,7 +3,6 @@ extern crate adams_lib;
 use adams_lib::network_struct::Graph;
 use adams_lib::algos::{RO, RoutingAlgo, Flow, StreamAwareGraph, AVBType};
 
-
 fn main() {
         let mut g = StreamAwareGraph::new();
         g.add_host();
