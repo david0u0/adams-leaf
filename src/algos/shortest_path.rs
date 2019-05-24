@@ -10,15 +10,15 @@ fn f64_eq(a: f64, b: f64) -> bool {
     return (a - b).abs() < 0.0001;
 }
 
-pub struct RO<'a> {
+pub struct SPF<'a> {
     g: StreamAwareGraph,
     route_table: RouteTable,
     dijkstra_algo: Dijkstra<'a, StreamAwareGraph>
 }
 
-impl <'a> RO<'a> {
+impl <'a> SPF<'a> {
     pub fn new(g: &'a StreamAwareGraph) -> Self {
-        return RO {
+        return SPF {
             g: g.clone(),
             route_table: HashMap::new(),
             dijkstra_algo: Dijkstra::new(g)
@@ -26,10 +26,10 @@ impl <'a> RO<'a> {
     }
 }
 
-impl <'a> RoutingAlgo for RO<'a> {
+impl <'a> RoutingAlgo for SPF<'a> {
     fn compute_routes(&mut self, flows: Vec<Flow>) {
         for flow in flows.into_iter() {
-            if let Flow::AVB { id, src, dst,  .. } = flow {
+            if let Flow::AVB { id, src, dst, .. } = flow {
                 let r = self.dijkstra_algo.get_route(src, dst);
                 self.route_table.insert(id, (flow, r));
             } else if let Flow::TT { id, src, dst, .. } = flow {

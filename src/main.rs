@@ -1,7 +1,7 @@
 extern crate adams_lib;
 
 use adams_lib::network_struct::Graph;
-use adams_lib::algos::{RO, RoutingAlgo, Flow, FlowStruct, StreamAwareGraph};
+use adams_lib::algos::{RO, RoutingAlgo, Flow, StreamAwareGraph, AVBType};
 
 
 fn main() {
@@ -22,12 +22,14 @@ fn main() {
         g.add_edge((4, 3), 10.0);
         g.add_edge((1, 3), 100.0);
     
-        g.inactivate_edge((0, 1));
-        
-        let flow = Flow::AVB(FlowStruct {
-            id: 0, src: 0, dst: 1, size: 100, period: 10, max_delay: 10
-        });
-        let mut algo = RO::new(g);
-        algo.compute_routes(vec![flow]);
-        let v = algo.get_multi_routes(0, 1);
+        let flow1 = Flow::TT {
+            id: 0, src: 0, dst: 1, size: 100, period: 10, max_delay: 10, offset: 10
+        };
+        let flow2 = Flow::AVB {
+            id: 0, src: 0, dst: 1, size: 100, period: 10,
+            max_delay: 10, avb_type: AVBType::new_type_a()
+        };
+
+        let mut algo = RO::new(&g);
+        algo.compute_routes(vec![flow1, flow2]);
 }

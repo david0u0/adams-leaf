@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::network_struct::Graph;
+use crate::network_struct::{Graph, OnOffGraph};
 
 #[derive(Copy, Clone)]
 enum NodeType {
@@ -78,14 +78,6 @@ impl StreamAwareGraph {
         }
         panic!("修改邊的活性時發現邊或節點不存在");
     }
-    pub fn activate_edge(&mut self, id_pair: (i32, i32)) {
-        self._change_edge_active(id_pair, true);
-        self._change_edge_active((id_pair.1, id_pair.0), true);
-    }
-    pub fn inactivate_edge(&mut self, id_pair: (i32, i32)) {
-        self._change_edge_active(id_pair, false);
-        self._change_edge_active((id_pair.1, id_pair.0), false);
-    }
     pub fn new() -> Self {
         return StreamAwareGraph {
             map: HashMap::new(),
@@ -93,6 +85,20 @@ impl StreamAwareGraph {
             edge_cnt: 0,
             next_node_id: 0,
         };
+    }
+}
+impl Clone for StreamAwareGraph {
+    fn clone(&self) -> Self {
+        let mut map: HashMap<i32, Node> = HashMap::new();
+        for (&id, node) in self.map.iter() {
+            map.insert(id, node.clone());
+        }
+        return StreamAwareGraph {
+            map,
+            node_cnt: self.node_cnt,
+            edge_cnt: self.edge_cnt,
+            next_node_id: self.next_node_id,
+        }
     }
 }
 impl Graph for StreamAwareGraph {
@@ -143,18 +149,13 @@ impl Graph for StreamAwareGraph {
         }
     }
 }
-
-impl Clone for StreamAwareGraph {
-    fn clone(&self) -> Self {
-        let mut map: HashMap<i32, Node> = HashMap::new();
-        for (&id, node) in self.map.iter() {
-            map.insert(id, node.clone());
-        }
-        return StreamAwareGraph {
-            map,
-            node_cnt: self.node_cnt,
-            edge_cnt: self.edge_cnt,
-            next_node_id: self.next_node_id,
-        }
+impl OnOffGraph for StreamAwareGraph {
+    fn activate_edge(&mut self, id_pair: (i32, i32)) {
+        self._change_edge_active(id_pair, true);
+        self._change_edge_active((id_pair.1, id_pair.0), true);
+    }
+    fn inactivate_edge(&mut self, id_pair: (i32, i32)) {
+        self._change_edge_active(id_pair, false);
+        self._change_edge_active((id_pair.1, id_pair.0), false);
     }
 }

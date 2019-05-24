@@ -1,33 +1,61 @@
 use std::collections::HashMap;
 use crate::network_struct::Graph;
 
-pub struct FlowStruct {
-    pub id: i32,
-    pub src: i32,
-    pub dst: i32,
-    pub size: u32,
-    pub period: u32,
-    pub max_delay: u32,
-}
-pub enum Flow {
-    AVB(FlowStruct),
-    TT(FlowStruct),
+macro_rules! flow_enum {
+    ( $enum_name: ident, $( $name: ident {
+        $( $field_name: ident: $field_type: ty ),*
+    } ),* ) => {
+        pub enum $enum_name {
+            $(
+                $name {
+                    id: i32,
+                    src: i32,
+                    dst: i32,
+                    size: u32,
+                    period: u32,
+                    max_delay: u32,
+                    $( $field_name: $field_type ),*
+                }
+            ),*
+        }
+    };
 }
 
-pub trait RoutingAlgo<G: Graph> {
-    fn new(g: G) -> Self;
+pub struct AVBType(bool);
+impl AVBType {
+    pub fn new_type_a() -> Self {
+        return AVBType(true);
+    }
+    pub fn new_type_b() -> Self {
+        return AVBType(false);
+    }
+    pub fn is_type_a(&self) -> bool {
+        return self.0;
+    }
+}
+
+flow_enum!(Flow,
+    TT {
+        offset: u32
+    },
+    AVB {
+        avb_type: AVBType
+    }
+);
+
+pub trait RoutingAlgo {
     fn compute_routes(&mut self, flows: Vec<Flow>);
     fn get_retouted_flows(&self) -> Vec<i32>;
     fn get_route(&self, id: i32) -> Vec<i32>;
 }
 
-pub type RouteTable = HashMap<i32, (FlowStruct, Option<Vec<i32>>)>;
+pub type RouteTable = HashMap<i32, (Flow, Option<(f64, Vec<i32>)>)>;
 
 mod stream_aware_graph;
 pub use stream_aware_graph::StreamAwareGraph;
 
-mod dijkstra;
-pub use dijkstra::Dijkstra;
+mod shortest_path;
+pub use shortest_path::SPF;
 
 mod routing_optimism;
 pub use routing_optimism::RO;
