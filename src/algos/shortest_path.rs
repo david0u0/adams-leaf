@@ -2,18 +2,14 @@ use std::collections::HashMap;
 use std::cell::RefCell;
 
 use crate::network_struct::Graph;
-use crate::algos::{StreamAwareGraph, RouteTable, Flow, RoutingAlgo};
-use crate::algos::cost_estimate;
 use crate::util::Dijkstra;
-
-fn f64_eq(a: f64, b: f64) -> bool {
-    return (a - b).abs() < 0.0001;
-}
+use super::{StreamAwareGraph, RouteTable, Flow, RoutingAlgo};
+use super::cost_estimate;
 
 pub struct SPF<'a> {
     g: StreamAwareGraph,
     route_table: RouteTable,
-    dijkstra_algo: Dijkstra<'a, StreamAwareGraph>
+    dijkstra_algo: Dijkstra<'a, usize, StreamAwareGraph>
 }
 
 impl <'a> SPF<'a> {
@@ -38,15 +34,18 @@ impl <'a> RoutingAlgo for SPF<'a> {
             }
         }
     }
-    fn get_retouted_flows(&self) -> Vec<i32> {
+    fn get_retouted_flows(&self) -> Vec<usize> {
         panic!("Not implemented!");
     }
-    fn get_route(&self, id: i32) -> Vec<i32> {
-        if let Some((_, flow)) = self.route_table.get(&id) {
-            if let Some((_, vec)) = &flow {
+    fn get_route(&self, id: usize) -> Vec<usize> {
+        if let Some((_, route)) = self.route_table.get(&id) {
+            if let Some((_, vec)) = route {
                 return vec.clone();
+            } else {
+                panic!("路徑無法連通");
             }
+        } else {
+            panic!("查無資料流");
         }
-        panic!();
     }
 }

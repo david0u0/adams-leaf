@@ -5,12 +5,7 @@ use adams_lib::algos::{RO, RoutingAlgo, Flow, StreamAwareGraph, AVBType};
 
 fn main() {
         let mut g = StreamAwareGraph::new();
-        g.add_host();
-        g.add_host();
-        g.add_host();
-        g.add_host();
-        g.add_host();
-        g.add_host();
+        g.add_host(Some(6));
         g.add_edge((0, 1), 100.0);
         g.add_edge((0, 2), 20.0/3.0);
         g.add_edge((0, 5), 20.0);

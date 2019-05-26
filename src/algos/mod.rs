@@ -55,9 +55,9 @@ impl AVBType {
 
 build_shared_enum! { 
     Flow {
-        id: i32,
-        src: i32,
-        dst: i32,
+        id: usize,
+        src: usize,
+        dst: usize,
         size: u32,
         period: u32,
         max_delay: u32
@@ -72,11 +72,11 @@ build_shared_enum! {
 
 pub trait RoutingAlgo {
     fn compute_routes(&mut self, flows: Vec<Flow>);
-    fn get_retouted_flows(&self) -> Vec<i32>;
-    fn get_route(&self, id: i32) -> Vec<i32>;
+    fn get_retouted_flows(&self) -> Vec<usize>;
+    fn get_route(&self, id: usize) -> Vec<usize>;
 }
 
-pub type RouteTable = HashMap<i32, (Flow, Option<(f64, Vec<i32>)>)>;
+pub type RouteTable = HashMap<usize, (Flow, Option<(f64, Vec<usize>)>)>;
 
 mod stream_aware_graph;
 pub use stream_aware_graph::StreamAwareGraph;
