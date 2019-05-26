@@ -1,5 +1,5 @@
 use std::hash::Hash;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use std::fmt::Debug;
 
@@ -37,6 +37,7 @@ impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
             return;
         }
         let mut paths: HashMap<Rc<Vec<K>>, f64> = HashMap::new();
+        let mut visited_edges: HashMap<K, HashSet<K>> = HashMap::new();
         let mut min_heap: MyMinHeap<f64, Rc<Vec<K>>> = MyMinHeap::new();
         let shortest = self.dijkstra_algo.get_route(src, dst);
         if self.k == 1 {
@@ -49,10 +50,16 @@ impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
             if paths.len() >= self.k {
                 break;
             }
-            self._for_each_deviation(&paths, cur_path.clone(), |next_dist, next_path| {
+            for i in 0..cur_path.len()-1 {
+                let set = visited_edges.entry(cur_path[i]).or_insert(HashSet::new());
+                set.insert(cur_path[i+1]);
+            }
+            self._for_each_deviation(&visited_edges, cur_path.clone(), |next_dist, next_path| {
                 let next_path = Rc::new(next_path);
                 if !min_heap.contains_key(&next_path) {
-                    min_heap.push(next_path, next_dist, ());
+                    if !paths.contains_key(&next_path) {
+                        min_heap.push(next_path, next_dist, ());
+                    }
                 }
             });
         }
@@ -76,7 +83,7 @@ impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
         self.route_table.insert((src, dst), vec);
     }
     #[allow(unused_must_use)]
-    fn _for_each_deviation(&mut self, prev_paths: &HashMap<Rc<Vec<K>>, f64>,
+    fn _for_each_deviation(&mut self, visited_edges: &HashMap<K, HashSet<K>>,
         cur_path: Rc<Vec<K>>,
         mut callback: impl FnMut(f64, Vec<K>) -> ()
     ) {
@@ -86,12 +93,9 @@ impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
             if i >= 1 {
                 self.g.inactivate_node(cur_path[i-1]);
             }
-            for (path, _) in prev_paths.iter() {
-                // ! 這裡有優化的空間
-                for i in 0..path.len() {
-                    if path[i] == cur_node {
-                        self.g.inactivate_edge((cur_node, path[i+1]));
-                    }
+            if let Some(set) = visited_edges.get(&cur_node) {
+                for &next_node in set.iter() {
+                    self.g.inactivate_edge((cur_node, next_node));
                 }
             }
 
@@ -100,9 +104,7 @@ impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
             let (_, postfix) = spf.get_route(cur_node, *cur_path.last().unwrap());
             let mut next_path = prefix.clone();
             next_path.extend(postfix);
-            if !prev_paths.contains_key(&next_path) {
-                callback(self.g.get_dist(&next_path), next_path);
-            }
+            callback(self.g.get_dist(&next_path), next_path);
             prefix.push(cur_node);
         }
         self.g.reset();
