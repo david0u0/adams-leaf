@@ -76,7 +76,7 @@ pub trait RoutingAlgo {
     fn get_route(&self, id: usize) -> Vec<usize>;
 }
 
-pub type RouteTable = HashMap<usize, (Flow, Option<(f64, Vec<usize>)>)>;
+pub type RouteTable = HashMap<usize, (Flow, (f64, Vec<usize>))>;
 
 mod stream_aware_graph;
 pub use stream_aware_graph::StreamAwareGraph;

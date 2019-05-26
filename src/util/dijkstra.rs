@@ -3,7 +3,7 @@ use std::hash::Hash;
 use std::cell::RefCell;
 
 use crate::network_struct::Graph;
-use crate::util::MyMinHeap;
+use super::MyMinHeap;
 
 pub struct Dijkstra<'a, K: Hash+Eq+Copy, G: Graph<K>> {
     g: &'a G,
@@ -37,10 +37,10 @@ impl <'a, K: Hash+Eq+Copy, G: Graph<K>> Dijkstra<'a, K, G> {
                 let next_dist = cur_dist + 1.0 / bandwidth;
                 if self.final_dist_map.contains_key(&next_pair) {
                     // DO NOTHING
-                } else if let Some((og_dist, backtrace)) = min_heap.get(next_id) {
+                } else if let Some((og_dist, backtrace)) = min_heap.get(&next_id) {
                     if *og_dist > next_dist {
                         (*backtrace.borrow_mut()) = cur_id;
-                        min_heap.decrease_priority(next_id, next_dist);
+                        min_heap.decrease_priority(&next_id, next_dist);
                     }
                 } else {
                     min_heap.push(next_id, next_dist, RefCell::new(cur_id));
@@ -48,18 +48,26 @@ impl <'a, K: Hash+Eq+Copy, G: Graph<K>> Dijkstra<'a, K, G> {
             });
         }
     }
-    pub fn get_route(&mut self, src_id: K, dst_id: K) -> Option<(f64, Vec<K>)> {
+    pub fn get_dist(&mut self, src_id: K, dst_id: K) -> f64 {
         if !self.routed_node_table.contains_key(&src_id) {
             self.compute_route(src_id);
         }
-        if !self.final_dist_map.contains_key(&(src_id, dst_id)) {
+        if let Some(entry) = self.final_dist_map.get(&(src_id, dst_id)) {
+            return entry.0;
+        } else {
             // NOTE: 路徑無法連通
-            return None;
+            return std::f64::MAX;
+        }
+    }
+    pub fn get_route(&mut self, src_id: K, dst_id: K) -> (f64, Vec<K>) {
+        if !self.routed_node_table.contains_key(&src_id) {
+            self.compute_route(src_id);
         }
         if let Some(entry) = self.final_dist_map.get(&(src_id, dst_id)) {
-            return Some((entry.0, self._recursive_get_route(src_id, dst_id)));
+            return (entry.0, self._recursive_get_route(src_id, dst_id));
         } else {
-            return None;
+            // NOTE: 路徑無法連通
+            return (std::f64::MAX, vec![src_id, dst_id]);
         }
     }
     fn _recursive_get_route(&self, src_id: K, dst_id: K) -> Vec<K> {
@@ -88,7 +96,7 @@ mod test {
         g.add_edge((1, 2), 20.0)?;
         g.add_edge((0, 2), 2.0)?;
         let mut algo = Dijkstra::new(&g);
-        assert_eq!(vec![0, 1, 2], algo.get_route(0, 2).unwrap().1);
+        assert_eq!(vec![0, 1, 2], algo.get_route(0, 2).1);
         return Ok(());
     }
     #[test]
@@ -103,14 +111,14 @@ mod test {
         g.add_edge((3, 4), 3.0)?;
 
         let mut algo = Dijkstra::new(&g);
-        assert_eq!(vec![0, 1, 3, 4], algo.get_route(0, 4).unwrap().1);
-        assert_eq!(vec![2, 1, 3, 4], algo.get_route(2, 4).unwrap().1);
-        assert_eq!(None, algo.get_route(0, 5));
+        assert_eq!(vec![0, 1, 3, 4], algo.get_route(0, 4).1);
+        assert_eq!(vec![2, 1, 3, 4], algo.get_route(2, 4).1);
+        assert_eq!(std::f64::MAX, algo.get_route(0, 5).0);
 
         let mut g = g.clone();
         g.add_edge((4, 5), 2.0)?;
         let mut algo = Dijkstra::new(&g);
-        assert_eq!(vec![0, 1, 3, 4, 5], algo.get_route(0, 5).unwrap().1);
+        assert_eq!(vec![0, 1, 3, 4, 5], algo.get_route(0, 5).1);
         return Ok(());
     }
 }

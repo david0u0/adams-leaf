@@ -2,15 +2,11 @@ use std::collections::HashMap;
 
 use crate::network_struct::{Graph, OnOffGraph};
 
-#[derive(Copy, Clone)]
-enum NodeType {
-    Host,
-    Switch,
-}
 struct Node {
-    node_type: NodeType,
+    is_switch: bool,
     edges: HashMap<usize, (f64, bool)>,
-    exist: bool
+    exist: bool,
+    active: bool,
 }
 impl Clone for Node {
     fn clone(&self) -> Self {
@@ -19,8 +15,9 @@ impl Clone for Node {
             edges.insert(id, edge);
         }
         return Node {
-            node_type: self.node_type.clone(),
+            is_switch: self.is_switch,
             exist: self.exist,
+            active: self.active,
             edges
         }
     }
@@ -30,6 +27,8 @@ pub struct StreamAwareGraph {
     nodes: Vec<Node>,
     node_cnt: usize,
     edge_cnt: usize,
+    inactive_edges: Vec<(usize, usize)>,
+    inactive_nodes: Vec<usize>
 }
 impl StreamAwareGraph {
     fn _add_node(&mut self, cnt: Option<usize>, is_switch: bool) -> Vec<usize> {
@@ -42,18 +41,12 @@ impl StreamAwareGraph {
         };
         let mut v: Vec<usize> = vec![];
         for _ in 0..cnt {
-            let node_type = {
-                if is_switch {
-                    NodeType::Switch
-                } else {
-                    NodeType::Host
-                }
-            };
             let id = self.nodes.len();
             self.node_cnt += 1;
             let node = Node {
-                node_type,
+                is_switch,
                 exist: true,
+                active: true,
                 edges: HashMap::new(),
             };
             self.nodes.push(node);
@@ -87,11 +80,21 @@ impl StreamAwareGraph {
             return Err("修改邊的活性時發現邊不存在".to_owned());
         }
     }
+    fn _change_node_active(&mut self, id: usize, active: bool) -> Result<(), String> {
+        if self._check_exist(id) {
+            self.nodes[id].active = active;
+            return Ok(());
+        } else {
+            return Err("修改節點的活性時發現節點不存在".to_owned());
+        }
+    }
     pub fn new() -> Self {
         return StreamAwareGraph {
             nodes: vec![],
             node_cnt: 0,
             edge_cnt: 0,
+            inactive_edges: vec![],
+            inactive_nodes: vec![]
         };
     }
 }
@@ -141,38 +144,61 @@ impl Graph<usize> for StreamAwareGraph {
     }
     fn foreach_edge(&self, id: usize, mut callback: impl FnMut(usize, f64) -> ()) {
         let node = &self.nodes[id];
-        for (id, (bandwidth, active)) in node.edges.iter() {
-            if *active && self.nodes[*id].exist {
-                callback(*id, *bandwidth);
+        for (&id, &(bandwidth, active)) in node.edges.iter() {
+            let node = &self.nodes[id];
+            if active && node.exist && node.active {
+                callback(id, bandwidth);
             }
         }
     }
     fn foreach_node(&self, mut callback: impl FnMut(usize, bool) -> ()) {
         for (id, node) in self.nodes.iter().enumerate() {
-            if node.exist {
-                match node.node_type {
-                    NodeType::Host => {
-                        callback(id, false);
-                    },
-                    NodeType::Switch => {
-                        callback(id, true);
-                    }
-                }
+            if node.exist && node.active {
+                callback(id, node.is_switch);
             }
         }
+    }
+    fn get_dist(&self, path: &Vec<usize>) -> f64 {
+        let mut dist = 0.0;
+        for i in 0..path.len()-1 {
+            let (cur, next) = (path[i], path[i+1]);
+            let (bandwidth, _) = self.nodes[cur].edges.get(&next).unwrap();
+            dist += 1.0 / bandwidth;
+        }
+        return dist;
     }
 }
 impl OnOffGraph<usize> for StreamAwareGraph {
     #[allow(unused_must_use)]
-    fn activate_edge(&mut self, id_pair: (usize, usize)) -> Result<(), String> {
-        self._change_edge_active(id_pair, true)?;
-        self._change_edge_active((id_pair.1, id_pair.0), true);
+    fn inactivate_edge(&mut self, id_pair: (usize, usize)) -> Result<(), String> {
+        if self._check_exist(id_pair.0) && self._check_exist(id_pair.1) {
+            self._change_edge_active(id_pair, false)?;
+            self._change_edge_active((id_pair.1, id_pair.0), false);
+            self.inactive_edges.push(id_pair);
+            return Ok(());
+        } else {
+            return Err("修改邊的活性時發現節點不存在".to_owned());
+        }
+    }
+    fn inactivate_node(&mut self, id: usize) -> Result<(), String> {
+        self._change_node_active(id, false)?;
+        self.inactive_nodes.push(id);
         return Ok(());
     }
     #[allow(unused_must_use)]
-    fn inactivate_edge(&mut self, id_pair: (usize, usize)) -> Result<(), String> {
-        self._change_edge_active(id_pair, false)?;
-        self._change_edge_active((id_pair.1, id_pair.0), false);
-        return Ok(());
+    fn reset(&mut self) {
+        let _self = self as *mut Self;
+        for pair in self.inactive_edges.iter() {
+            unsafe {
+                (*_self)._change_edge_active(*pair, true);
+            }
+        }
+        for id in self.inactive_nodes.iter() {
+            unsafe {
+                (*_self)._change_node_active(*id, true);
+            }
+        }
+        self.inactive_edges.clear();
+        self.inactive_nodes.clear();
     }
 }

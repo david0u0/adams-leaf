@@ -39,11 +39,7 @@ impl <'a> RoutingAlgo for RO<'a> {
     }
     fn get_route(&self, id: usize) -> Vec<usize> {
         if let Some((_, route)) = self.route_table.get(&id) {
-            if let Some((_, vec)) = &route {
-                return vec.clone();
-            } else {
-                panic!("路徑無法連通");
-            }
+            return route.1.clone();
         } else {
             panic!("查無資料流");
         }
