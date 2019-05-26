@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::cell::RefCell;
+use std::cell::Cell;
 
 use crate::network_struct::Graph;
 use super::MyMinHeap;
 
 pub struct Dijkstra<'a, K: Hash+Eq+Copy, G: Graph<K>> {
     g: &'a G,
-    final_dist_map: HashMap<(K, K), (f64, RefCell<K>)>,
+    final_dist_map: HashMap<(K, K), (f64, Cell<K>)>,
     routed_node_table: HashMap<K, bool>
 }
 
@@ -25,8 +25,8 @@ impl <'a, K: Hash+Eq+Copy, G: Graph<K>> Dijkstra<'a, K, G> {
         }
         self.routed_node_table.insert(src_id, true);
 
-        let mut min_heap: MyMinHeap<f64, K, RefCell<K>> = MyMinHeap::new();
-        min_heap.push( src_id, 0.0, RefCell::new(src_id) );
+        let mut min_heap: MyMinHeap<f64, K, Cell<K>> = MyMinHeap::new();
+        min_heap.push( src_id, 0.0, Cell::new(src_id) );
         // 從優先權佇列中移除，並塞進最終 dist map
         while let Some((cur_id, cur_dist, backtrace)) = min_heap.pop() {
             self.final_dist_map.insert((src_id, cur_id),
@@ -39,11 +39,11 @@ impl <'a, K: Hash+Eq+Copy, G: Graph<K>> Dijkstra<'a, K, G> {
                     // DO NOTHING
                 } else if let Some((og_dist, backtrace)) = min_heap.get(&next_id) {
                     if *og_dist > next_dist {
-                        (*backtrace.borrow_mut()) = cur_id;
+                        backtrace.set(cur_id);
                         min_heap.decrease_priority(&next_id, next_dist);
                     }
                 } else {
-                    min_heap.push(next_id, next_dist, RefCell::new(cur_id));
+                    min_heap.push(next_id, next_dist, Cell::new(cur_id));
                 }
             });
         }
@@ -74,8 +74,8 @@ impl <'a, K: Hash+Eq+Copy, G: Graph<K>> Dijkstra<'a, K, G> {
         if src_id == dst_id {
             return vec![src_id];
         } else {
-            let prev_id = self.final_dist_map.get(&(src_id, dst_id)).unwrap().1.borrow();
-            let mut path = self._recursive_get_route(src_id, *prev_id);
+            let prev_id = self.final_dist_map.get(&(src_id, dst_id)).unwrap().1.get();
+            let mut path = self._recursive_get_route(src_id, prev_id);
             path.push(dst_id);
             return path;
         }

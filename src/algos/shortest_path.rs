@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::cell::RefCell;
 
 use crate::network_struct::Graph;
 use crate::util::Dijkstra;
