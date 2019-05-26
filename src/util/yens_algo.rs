@@ -31,13 +31,12 @@ impl <'a, K: Hash+Eq+Copy, G: OnOffGraph<K>> YensAlgo<'a, K, G> {
         }
         return self.route_table.get(&pair).unwrap();
     }
-    #[allow(unused_must_use)]
     pub fn compute_routes(&mut self, src: K, dst: K) {
         if self.route_table.contains_key(&(src, dst)) {
             return;
         }
         let mut paths: HashMap<Rc<Vec<K>>, f64> = HashMap::new();
-        let mut min_heap: MyMinHeap<f64, Rc<Vec<K>>, ()> = MyMinHeap::new();
+        let mut min_heap: MyMinHeap<f64, Rc<Vec<K>>> = MyMinHeap::new();
         let shortest = self.dijkstra_algo.get_route(src, dst);
         if self.k == 1 {
             self.route_table.insert((src, dst), vec![shortest]);
@@ -46,31 +45,15 @@ impl <'a, K: Hash+Eq+Copy, G: OnOffGraph<K>> YensAlgo<'a, K, G> {
         min_heap.push(Rc::new(shortest.1), shortest.0, ());
         while let Some((cur_path, dist, _)) = min_heap.pop() {
             paths.insert(cur_path.clone(), dist);
-            let mut prefix: Vec<K> = vec![];
-            for i in 0..cur_path.len()-1 {
-                let cur_node = cur_path[i];
-                if i >= 1 {
-                    self.g.inactivate_node(cur_path[i-1]);
-                }
-                self.g.inactivate_edge((cur_node, cur_path[i+1]));
-                let mut spf = Dijkstra::new(&self.g);
-                let (_, postfix) = spf.get_route(cur_node, dst);
-                let mut next_path = prefix.clone();
-                next_path.extend(postfix);
-                let dist = self.g.get_dist(&next_path);
-                if !paths.contains_key(&next_path) {
-                    let next_path = Rc::new(next_path);
-                    if !min_heap.contains_key(&next_path) {
-                        min_heap.push(next_path, dist, ());
-                    }
-                }
-                prefix.push(cur_node);
-            }
-            self.g.reset();
-
             if paths.len() >= self.k {
                 break;
             }
+            self._for_each_deviation(&paths, cur_path.clone(), |next_dist, next_path| {
+                let next_path = Rc::new(next_path);
+                if !min_heap.contains_key(&next_path) {
+                    min_heap.push(next_path, next_dist, ());
+                }
+            });
         }
         drop(min_heap);
         let mut vec: Vec<Path<K>> = paths.into_iter().map(|(vec, dist)| {
@@ -91,6 +74,38 @@ impl <'a, K: Hash+Eq+Copy, G: OnOffGraph<K>> YensAlgo<'a, K, G> {
         });
         self.route_table.insert((src, dst), vec);
     }
+    #[allow(unused_must_use)]
+    fn _for_each_deviation(&mut self, prev_paths: &HashMap<Rc<Vec<K>>, f64>,
+        cur_path: Rc<Vec<K>>,
+        mut callback: impl FnMut(f64, Vec<K>) -> ()
+    ) {
+        let mut prefix: Vec<K> = vec![];
+        for i in 0..cur_path.len()-1 {
+            let cur_node = cur_path[i];
+            if i >= 1 {
+                self.g.inactivate_node(cur_path[i-1]);
+            }
+            for (path, _) in prev_paths.iter() {
+                // ! 這裡有優化的空間
+                for i in 0..path.len() {
+                    if path[i] == cur_node {
+                        self.g.inactivate_edge((cur_node, path[i+1]));
+                    }
+                }
+            }
+
+            // ? 這裡是不是有優化的空間?
+            let mut spf = Dijkstra::new(&self.g);
+            let (_, postfix) = spf.get_route(cur_node, *cur_path.last().unwrap());
+            let mut next_path = prefix.clone();
+            next_path.extend(postfix);
+            if !prev_paths.contains_key(&next_path) {
+                callback(self.g.get_dist(&next_path), next_path);
+            }
+            prefix.push(cur_node);
+        }
+        self.g.reset();
+    }
 }
 
 #[cfg(test)]
@@ -110,7 +125,6 @@ mod test {
         g.add_edge((2, 3), 10.0)?;
         g.add_edge((2, 4), 10.0)?;
         let mut algo = YensAlgo::new(&g, 3);
-        //println!("{:?}", algo.get_routes(0, 2));
         assert_eq!(vec![0, 1, 2], algo.get_routes(0, 2)[0].1);
         assert_eq!(vec![0, 1, 3, 2], algo.get_routes(0, 2)[1].1);
         assert_eq!(vec![0, 1, 4, 2], algo.get_routes(0, 2)[2].1);

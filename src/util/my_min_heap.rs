@@ -8,7 +8,7 @@ enum Justify {
     Root
 }
 
-pub struct MyMinHeap<P: PartialOrd, K: Hash+Eq+Clone, V> {
+pub struct MyMinHeap<P: PartialOrd, K: Hash+Eq+Clone, V=()> {
     vec: Vec<Box<(K, P, V)>>,
     table: HashMap<K, usize>
 }
