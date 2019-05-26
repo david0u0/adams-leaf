@@ -1,6 +1,7 @@
 use std::hash::Hash;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::fmt::Debug;
 
 use super::Dijkstra;
 use super::MyMinHeap;
@@ -15,7 +16,7 @@ pub struct YensAlgo<'a, K: Hash+Eq+Copy, G: OnOffGraph<K>> {
     dijkstra_algo: Dijkstra<'a, K, G>,
 }
 
-impl <'a, K: Hash+Eq+Copy, G: OnOffGraph<K>> YensAlgo<'a, K, G> {
+impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
     pub fn new(g: &'a G, k: usize) -> Self {
         return YensAlgo {
             k,
@@ -116,7 +117,7 @@ mod test {
     #[test]
     fn test_yens_algo1() -> Result<(), String> {
         let mut g = StreamAwareGraph::new();
-        g.add_host(Some(5));
+        g.add_host(Some(100));
         g.add_edge((0, 1), 10.0)?;
         g.add_edge((1, 2), 20.0)?;
         g.add_edge((0, 2), 2.0)?;
@@ -124,10 +125,31 @@ mod test {
         g.add_edge((1, 3), 15.0)?;
         g.add_edge((2, 3), 10.0)?;
         g.add_edge((2, 4), 10.0)?;
-        let mut algo = YensAlgo::new(&g, 3);
+
+        for i in 4..100 {
+            for j in i+1..100 {
+                g.add_edge((i, j), (i*j) as f64)?;
+            }
+        }
+
+        let mut algo = YensAlgo::new(&g, 10);
         assert_eq!(vec![0, 1, 2], algo.get_routes(0, 2)[0].1);
         assert_eq!(vec![0, 1, 3, 2], algo.get_routes(0, 2)[1].1);
         assert_eq!(vec![0, 1, 4, 2], algo.get_routes(0, 2)[2].1);
+        assert_eq!(4, algo.get_routes(0, 2).len());
+
+        assert_eq!(vec![0, 1, 4, 99], algo.get_routes(0, 99)[0].1);
+        assert_eq!(vec![0, 1, 4, 98, 99], algo.get_routes(0, 99)[1].1);
+        assert_eq!(vec![0, 1, 4, 97, 99], algo.get_routes(0, 99)[2].1);
+        assert_eq!(10, algo.get_routes(0, 99).len());
+
+        assert_eq!(vec![0, 1, 4, 99, 5], algo.get_routes(0, 5)[0].1);
+        assert_eq!(vec![0, 1, 4, 98, 5], algo.get_routes(0, 5)[1].1);
+        assert_eq!(vec![0, 1, 4, 97, 5], algo.get_routes(0, 5)[2].1);
+        assert_eq!(vec![0, 1, 4, 99, 98, 5], algo.get_routes(0, 5)[3].1);
+        assert_eq!(vec![0, 1, 4, 98, 99, 5], algo.get_routes(0, 5)[4].1);
+        assert_eq!(10, algo.get_routes(0, 5).len());
+
         return Ok(());
     }
 }

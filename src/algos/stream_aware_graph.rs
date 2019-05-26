@@ -162,8 +162,11 @@ impl Graph<usize> for StreamAwareGraph {
         let mut dist = 0.0;
         for i in 0..path.len()-1 {
             let (cur, next) = (path[i], path[i+1]);
-            let (bandwidth, _) = self.nodes[cur].edges.get(&next).unwrap();
-            dist += 1.0 / bandwidth;
+            if let Some((bandwidth, _)) = self.nodes[cur].edges.get(&next) {
+                dist += 1.0 / bandwidth;
+            } else {
+                return std::f64::MAX;
+            }
         }
         return dist;
     }
@@ -191,6 +194,7 @@ impl OnOffGraph<usize> for StreamAwareGraph {
         for pair in self.inactive_edges.iter() {
             unsafe {
                 (*_self)._change_edge_active(*pair, true);
+                (*_self)._change_edge_active((pair.1, pair.0), true);
             }
         }
         for id in self.inactive_nodes.iter() {
