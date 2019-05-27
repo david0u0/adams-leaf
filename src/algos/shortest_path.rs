@@ -15,7 +15,7 @@ impl <'a> SPF<'a> {
     pub fn new(g: &'a StreamAwareGraph) -> Self {
         return SPF {
             g: g.clone(),
-            route_table: HashMap::new(),
+            route_table: vec![],
             dijkstra_algo: Dijkstra::new(g)
         };
     }
@@ -26,21 +26,29 @@ impl <'a> RoutingAlgo for SPF<'a> {
         for flow in flows.into_iter() {
             if let Flow::AVB { id, src, dst, .. } = flow {
                 let r = self.dijkstra_algo.get_route(src, dst);
-                self.route_table.insert(id, (flow, r));
+                if id == self.route_table.len() {
+                    self.route_table.push((flow, r.0, r.1));
+                } else if id < self.route_table.len() {
+                    self.route_table[id] = (flow, r.0, r.1);
+                } else {
+                    panic!("請按順序填入資料流");
+                }
             } else if let Flow::TT { id, src, dst, .. } = flow {
                 let r = self.dijkstra_algo.get_route(src, dst);
-                self.route_table.insert(id, (flow, r));
+                if id == self.route_table.len() {
+                    self.route_table.push((flow, r.0, r.1));
+                } else if id < self.route_table.len() {
+                    self.route_table[id] = (flow, r.0, r.1);
+                } else {
+                    panic!("請按順序填入資料流");
+                }
             }
         }
     }
-    fn get_retouted_flows(&self) -> Vec<usize> {
+    fn get_retouted_flows(&self) -> &Vec<usize> {
         panic!("Not implemented!");
     }
-    fn get_route(&self, id: usize) -> Vec<usize> {
-        if let Some((_, route)) = self.route_table.get(&id) {
-            return route.1.clone();
-        } else {
-            panic!("查無資料流");
-        }
+    fn get_route(&self, id: usize) -> &Vec<usize> {
+        return &self.route_table[id].2;
     }
 }

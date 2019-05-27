@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 macro_rules! build_shared_enum {
     (@dup $enum_name: ident, $( $name: ident {
         $( $field_name: ident: $field_type: ty ),*
@@ -55,6 +53,7 @@ impl AVBType {
 
 build_shared_enum! { 
     Flow {
+        exist: bool,
         id: usize,
         src: usize,
         dst: usize,
@@ -72,11 +71,19 @@ build_shared_enum! {
 
 pub trait RoutingAlgo {
     fn compute_routes(&mut self, flows: Vec<Flow>);
-    fn get_retouted_flows(&self) -> Vec<usize>;
-    fn get_route(&self, id: usize) -> Vec<usize>;
+    fn get_retouted_flows(&self) -> &Vec<usize>;
+    fn get_route(&self, id: usize) -> &Vec<usize>;
 }
 
-pub type RouteTable = HashMap<usize, (Flow, (f64, Vec<usize>))>;
+/// * `RouteTable[id].0` - `id` 這個資料流的資訊。
+/// * `RouteTable[id].1` - `id` 這個資料流的成本。
+/// * `RouteTable[id].2` - `id` 這個資料流的路徑。
+pub type RouteTable = Vec<(Flow, f64, Vec<usize>)>;
+
+/// 所有 TT 資料流的 Gate Control List，為二維陣列。第一維代表不同的邊，第二維隨時間成長。
+/// * `GCL[edge][].0` - 這個時段開始的時間。
+/// * `GCL[edge][].1` - 這個時段是開還是關。
+pub type GCL = Vec<Vec<(f64, bool)>>;
 
 mod stream_aware_graph;
 pub use stream_aware_graph::StreamAwareGraph;
