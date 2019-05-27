@@ -1,3 +1,6 @@
+extern crate rand;
+use rand::{Rng, ThreadRng};
+
 use std::hash::Hash;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -14,12 +17,14 @@ pub struct YensAlgo<'a, K: Hash+Eq+Copy, G: OnOffGraph<K>> {
     k: usize,
     route_table: HashMap<(K, K), Vec<Path<K>>>,
     dijkstra_algo: Dijkstra<'a, K, G>,
+    rng: ThreadRng,
 }
 
 impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
     pub fn new(g: &'a G, k: usize) -> Self {
         return YensAlgo {
             k,
+            rng: rand::thread_rng(),
             g: g.clone(),
             route_table: HashMap::new(),
             dijkstra_algo: Dijkstra::new(g)
@@ -36,14 +41,11 @@ impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
         if self.route_table.contains_key(&(src, dst)) {
             return;
         }
+        let _self = self as *mut Self;
         let mut paths: HashMap<Rc<Vec<K>>, f64> = HashMap::new();
         let mut visited_edges: HashMap<K, HashSet<K>> = HashMap::new();
         let mut min_heap: MyMinHeap<f64, Rc<Vec<K>>> = MyMinHeap::new();
         let shortest = self.dijkstra_algo.get_route(src, dst);
-        if self.k == 1 {
-            self.route_table.insert((src, dst), vec![shortest]);
-            return;
-        }
         min_heap.push(Rc::new(shortest.1), shortest.0, ());
         while let Some((cur_path, dist, _)) = min_heap.pop() {
             paths.insert(cur_path.clone(), dist);
@@ -58,7 +60,11 @@ impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
                 let next_path = Rc::new(next_path);
                 if !min_heap.contains_key(&next_path) {
                     if !paths.contains_key(&next_path) {
-                        min_heap.push(next_path, next_dist, ());
+                        // 將給路徑長加上一個隨機的極小值，確保同樣長度的路徑之間存在隨機性
+                        let rand_num = unsafe {
+                            (*_self).rng.gen_range(1.0, 1.00001)
+                        };
+                        min_heap.push(next_path.clone(), next_dist * rand_num, ());
                     }
                 }
             });
@@ -98,7 +104,6 @@ impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
                     self.g.inactivate_edge((cur_node, next_node));
                 }
             }
-
             // ? 這裡是不是有優化的空間?
             let mut spf = Dijkstra::new(&self.g);
             let (_, postfix) = spf.get_route(cur_node, *cur_path.last().unwrap());
