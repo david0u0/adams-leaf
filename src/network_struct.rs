@@ -3,12 +3,15 @@ use std::hash::Hash;
 pub trait Graph<K: Hash+Eq>: Clone {
     fn add_host(&mut self, cnt: Option<usize>) -> Vec<K>;
     fn add_switch(&mut self, cnt: Option<usize>) -> Vec<K>;
-    fn add_edge(&mut self, id_pair: (K, K), bandwidth: f64) -> Result<(), String>;
+    fn add_edge(&mut self, id_pair: (K, K), bandwidth: f64) -> Result<K, String>;
     fn del_edge(&mut self, id_pair: (K, K)) -> Result<f64, String>;
     fn del_node(&mut self, id: K) -> Result<(), String>;
     fn foreach_edge(&self, id: K, callback: impl FnMut(K, f64) -> ());
     fn foreach_node(&self, callback: impl FnMut(K, bool) -> ());
     fn get_dist(&self, path: &Vec<K>) -> f64;
+    fn get_edge_ids(&self, path: &Vec<K>) -> Vec<K>;
+    fn get_edge_cnt(&self) -> usize;
+    fn get_node_cnt(&self) -> usize;
 }
 
 pub trait OnOffGraph<K: Hash+Eq>: Graph<K> {

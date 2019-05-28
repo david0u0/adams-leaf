@@ -1,7 +1,7 @@
-extern crate adams_lib;
+extern crate adams_leaf;
 
-use adams_lib::network_struct::Graph;
-use adams_lib::algos::{RO, RoutingAlgo, Flow, StreamAwareGraph, AVBType};
+use adams_leaf::network_struct::Graph;
+use adams_leaf::algos::{RO, SPF, RoutingAlgo, Flow, StreamAwareGraph, AVBType};
 
 fn main() -> Result<(), String> {
     let mut g = StreamAwareGraph::new();
@@ -17,16 +17,14 @@ fn main() -> Result<(), String> {
     g.add_edge((1, 3), 100.0)?;
 
     let flow1 = Flow::TT {
-        exist: true,
         id: 0, src: 0, dst: 1, size: 100, period: 10, max_delay: 10, offset: 10
     };
     let flow2 = Flow::AVB {
-        exist: true,
         id: 1, src: 0, dst: 2, size: 100, period: 10,
         max_delay: 10, avb_type: AVBType::new_type_a()
     };
-    let mut algo = RO::new(&g);
-    algo.compute_routes(vec![flow1, flow2]);
+    let mut algo = RO::new(&g, 100);
+    algo.compute_routes(vec![flow1.clone(), flow2.clone()]);
     println!("{:?}", algo.get_route(1));
     println!("{:?}", algo.get_route(0));
 

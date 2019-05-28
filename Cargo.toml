@@ -6,11 +6,3 @@ edition = "2018"
 
 [dependencies]
 rand = "0.5.5"
-
-[lib]
-name = "adams_lib"
-path = "src/lib.rs"
-
-[[bin]]
-name = "adams_leaf"
-path = "src/main.rs"

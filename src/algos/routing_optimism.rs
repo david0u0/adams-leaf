@@ -2,21 +2,23 @@ use std::collections::HashMap;
 
 use crate::network_struct::Graph;
 use crate::util::Dijkstra;
-use super::{StreamAwareGraph, RouteTable, Flow, RoutingAlgo};
+use super::{StreamAwareGraph, RouteTable, Flow, RoutingAlgo, GCL};
 use super::cost_estimate;
 
 pub struct RO<'a> {
     g: StreamAwareGraph,
     route_table: RouteTable,
-    dijkstra_algo: Dijkstra<'a, usize, StreamAwareGraph>
+    dijkstra_algo: Dijkstra<'a, usize, StreamAwareGraph>,
+    gcl: GCL,
 }
 
 impl <'a> RO<'a> {
-    pub fn new(g: &'a StreamAwareGraph) -> Self {
+    pub fn new(g: &'a StreamAwareGraph, hyper_p: usize) -> Self {
         return RO {
             g: g.clone(),
-            route_table: vec![],
-            dijkstra_algo: Dijkstra::new(g)
+            gcl: GCL::new(hyper_p, g.get_edge_cnt()),
+            route_table: RouteTable::new(),
+            dijkstra_algo: Dijkstra::new(g),
         };
     }
 }
@@ -24,24 +26,12 @@ impl <'a> RO<'a> {
 impl <'a> RoutingAlgo for RO<'a> {
     fn compute_routes(&mut self, flows: Vec<Flow>) {
         for flow in flows.into_iter() {
-            if let Flow::AVB { id, src, dst, .. } = flow {
+            if let Flow::AVB { src, dst, .. } = flow {
                 let r = self.dijkstra_algo.get_route(src, dst);
-                if id == self.route_table.len() {
-                    self.route_table.push((flow, r.0, r.1));
-                } else if id < self.route_table.len() {
-                    self.route_table[id] = (flow, r.0, r.1);
-                } else {
-                    panic!("請按順序填入資料流");
-                }
-            } else if let Flow::TT { id, src, dst, .. } = flow {
+                self.route_table.insert(flow, r.0, r.1);
+            } else if let Flow::TT { src, dst, .. } = flow {
                 let r = self.dijkstra_algo.get_route(src, dst);
-                if id == self.route_table.len() {
-                    self.route_table.push((flow, r.0, r.1));
-                } else if id < self.route_table.len() {
-                    self.route_table[id] = (flow, r.0, r.1);
-                } else {
-                    panic!("請按順序填入資料流");
-                }
+                self.route_table.insert(flow, r.0, r.1);
             }
         }
     }
@@ -49,6 +39,6 @@ impl <'a> RoutingAlgo for RO<'a> {
         panic!("Not implemented!");
     }
     fn get_route(&self, id: usize) -> &Vec<usize> {
-        return &self.route_table[id].2;
+        return self.route_table.get_route(id);
     }
 }
