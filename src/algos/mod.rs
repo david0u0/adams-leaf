@@ -146,6 +146,9 @@ pub use shortest_path::SPF;
 mod routing_optimism;
 pub use routing_optimism::RO;
 
+mod aco;
+pub use aco::ACO;
+
 pub mod cost_estimate;
 
 #[cfg(test)]
