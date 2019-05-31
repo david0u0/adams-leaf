@@ -9,7 +9,6 @@ pub trait Graph<K: Hash+Eq>: Clone {
     fn foreach_edge(&self, id: K, callback: impl FnMut(K, f64) -> ());
     fn foreach_node(&self, callback: impl FnMut(K, bool) -> ());
     fn get_dist(&self, path: &Vec<K>) -> f64;
-    fn get_edge_ids(&self, path: &Vec<K>) -> Vec<K>;
     fn get_edge_cnt(&self) -> usize;
     fn get_node_cnt(&self) -> usize;
 }

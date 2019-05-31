@@ -216,8 +216,8 @@ mod test {
     use super::*;
     #[test]
     fn test_ant_aco1() {
-        let mut aco = ACO::new(vec![0; 10], 3, None);
-        aco.routine_aco(300, &vec![[1.0; 10]; 10], |state| {
+        let mut aco = ACO::new(vec![0; 10], 2, None);
+        aco.routine_aco(20, &vec![[1.0; 10]; 10], |state| {
             let mut cost = 6.0;
             for (i, &s) in state.iter().enumerate() {
                 if i % 2 == 0 {
@@ -228,7 +228,7 @@ mod test {
             }
             cost / 6.0
         });
-        assert_eq!(vec![0, 2, 0, 2, 0, 2, 0, 2, 0, 2], *aco.get_state());
+        assert_eq!(vec![0, 1, 0, 1, 0, 1, 0, 1, 0, 1], *aco.get_state());
     }
     #[test]
     fn test_ant_reorder() {
