@@ -30,6 +30,11 @@ impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
             dijkstra_algo: Dijkstra::new(g)
         }
     }
+    /// 回歸普通的 Dijkstra 算法
+    pub fn get_shortest_route(&mut self, src: K, dst: K) -> Path<K> {
+        self.dijkstra_algo.get_route(src, dst)
+    }
+    // TODO 這個 Vec<Path> 的結構是兩層向量，有優化空間
     pub fn get_routes(&mut self, src: K, dst: K) -> &Vec<Path<K>> {
         let pair = (src, dst);
         if !self.route_table.contains_key(&pair) {

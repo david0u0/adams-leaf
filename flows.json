@@ -1,0 +1,46 @@
+{
+    "tt_flows": [
+        {
+            "src": 0,
+            "dst": 1,
+            "size": 100,
+            "period": 10,
+            "max_delay": 100.0,
+            "offset": 10
+        }
+    ],
+    "avb_flows": [
+        {
+            "src": 0,
+            "dst": 2,
+            "size": 100,
+            "period": 10,
+            "max_delay": 200.0,
+            "avb_type": "A"
+        },
+        {
+            "src": 0,
+            "dst": 2,
+            "size": 100,
+            "period": 10,
+            "max_delay": 200.0,
+            "avb_type": "A"
+        },
+        {
+            "src": 0,
+            "dst": 2,
+            "size": 100,
+            "period": 10,
+            "max_delay": 200.0,
+            "avb_type": "A"
+        },
+        {
+            "src": 0,
+            "dst": 2,
+            "size": 100,
+            "period": 10,
+            "max_delay": 200.0,
+            "avb_type": "A"
+        }
+    ]
+}

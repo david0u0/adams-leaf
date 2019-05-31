@@ -60,7 +60,7 @@ build_shared_enum! {
         src: usize,
         dst: usize,
         period: u32,
-        max_delay: u32
+        max_delay: f64
     },
     AVB {
         avb_type: AVBType
@@ -78,7 +78,7 @@ pub trait RoutingAlgo {
 
 mod helper_struct {
     use super::{Flow};
-    pub const MAX_FLOW_ID: usize = 99999;
+    pub const MAX_FLOW_ID: usize = 9999;
     pub struct RouteTable {
         vec: Vec<Option<(Flow, f64, Vec<usize>)>>
     }
@@ -117,18 +117,30 @@ mod helper_struct {
             }
             self.vec[id] = Some((flow, cost, route));
         }
+        pub fn foreach_flow(&self, mut callback: impl FnMut(&Flow)) {
+            for maybe_flow in self.vec.iter() {
+                if let Some((flow, _, _)) = maybe_flow {
+                    callback(flow);
+                } else {
+                    break;
+                }
+            }
+        }
     }
     
     pub struct GCL {
         hyper_p: usize,
+        // TODO 這個資料結構有優化的空間
         vec: Vec<Vec<(usize, usize)>>,
     }
     impl GCL {
         pub fn new(hyper_p: usize, edge_count: usize) -> Self {
-            return GCL { vec: vec![vec![]; edge_count], hyper_p };
+            // FIXME 底下這行是寫來測試用的
+            return GCL { vec: vec![vec![(0, 30), (50, 70)]; edge_count], hyper_p };
+            //return GCL { vec: vec![vec![]; edge_count], hyper_p };
         }
         /// 回傳 `link_id` 上所有閘門關閉事件。
-        /// * `回傳值` - 一個陣列，其內容為(事件開始時間, 事件持續時間);
+        /// * `回傳值` - 一個陣列，其內容為 (事件開始時間, 事件持續時間);
         pub fn get_close_event(&self, link_id: usize) -> &Vec<(usize, usize)> {
             return &self.vec[link_id];
         }

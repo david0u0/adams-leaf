@@ -16,8 +16,10 @@ pub fn compute_avb_latency(g: &StreamAwareGraph, flow: &Flow, route_table: &Rout
         let overlap_flow_id = g.get_overlap_flows(route);
         let mut end_to_end_lanency = 0.0;
         for (i, (link_id, bandwidth)) in g.get_edges_id_bandwidth(route).into_iter().enumerate() {
-            let wcd = wcd_on_single_link(*id, *size, bandwidth, route_table, &overlap_flow_id[i]);
-            end_to_end_lanency += wcd + tt_interfere_avb_single_link(link_id, wcd as f64, gcl) as f64;
+            let wcd = wcd_on_single_link(*id, *size,
+                bandwidth, route_table, &overlap_flow_id[i]);
+            end_to_end_lanency += wcd + tt_interfere_avb_single_link(
+                link_id, wcd as f64, gcl) as f64;
         }
         end_to_end_lanency
     } else {
@@ -44,14 +46,17 @@ fn wcd_on_single_link(id: usize, size: u32, bandwidth: f64, route_table: &RouteT
 fn tt_interfere_avb_single_link(link_id: usize, wcd: f64, gcl: &GCL) -> usize {
     let mut i_max = 0;
     let all_gce = gcl.get_close_event(link_id);
-    for (mut j, _) in all_gce.iter().enumerate() {
+    for mut j in 0..all_gce.len() {
         let (mut i_cur, mut rem) = (0, wcd as i32);
         let gce_ptr = all_gce[j];
         while rem >= 0 {
-            let gce_ptr_next = all_gce[j+1];
             i_cur += gce_ptr.1;
-            rem -= (gce_ptr_next.0 - (gce_ptr.0 + gce_ptr.1)) as i32;
             j += 1;
+            if j == all_gce.len() {
+                break;
+            }
+            let gce_ptr_next = all_gce[j];
+            rem -= (gce_ptr_next.0 - (gce_ptr.0 + gce_ptr.1)) as i32;
         }
         i_max = std::cmp::max(i_max, i_cur);
     }

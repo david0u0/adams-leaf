@@ -189,7 +189,7 @@ impl ACO {
     /// * `cmp` - 一個函式。若 cmp(a, b) = true，則 a 會排在 b 前面。
     pub fn reorder<T: Clone, F: Fn(&T, &T) -> bool>(&mut self, state_key: &mut Vec<T>, cmp: F) {
         assert_eq!(state_key.len(), self.state.len());
-        let mut tmp_vec = state_key.into_iter().enumerate().map(|(i, sv)| {
+        let mut tmp_vec = state_key.iter().enumerate().map(|(i, sv)| {
             (i, sv)
         }).collect::<Vec<_>>();
         tmp_vec.sort_by(|a, b| {
