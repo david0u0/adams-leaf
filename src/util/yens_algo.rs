@@ -122,6 +122,7 @@ mod test {
     use crate::algos::StreamAwareGraph;
     use super::YensAlgo;
     #[test]
+    #[ignore] // 用 cargo test -- --ignored 才可以測試
     fn test_yens_algo1() -> Result<(), String> {
         let mut g = StreamAwareGraph::new();
         g.add_host(Some(100));
