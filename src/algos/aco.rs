@@ -41,12 +41,12 @@ impl Ord for WeightedState {
     }
 }
 
-fn select_cluster(visibility: &[f64; MAX_K], pharamon: &[f64; MAX_K], k: usize, q0: f64) -> usize {
+fn select_cluster(visibility: &[f64; MAX_K], pheromone: &[f64; MAX_K], k: usize, q0: f64) -> usize {
     if rand::thread_rng().gen_range(0.0, 1.0) < q0 {
         let (mut min_i, mut min) = (0, std::f64::MAX);
         for i in 0..k {
-            if min > pharamon[i] * visibility[i] {
-                min = pharamon[i] * visibility[i];
+            if min > pheromone[i] * visibility[i] {
+                min = pheromone[i] * visibility[i];
                 min_i = i;
             }
         }
@@ -54,12 +54,12 @@ fn select_cluster(visibility: &[f64; MAX_K], pharamon: &[f64; MAX_K], k: usize, 
     } else {
         let mut sum = 0.0;
         for i in 0..k {
-            sum += pharamon[i] * visibility[i];
+            sum += pheromone[i] * visibility[i];
         }
         let rand_f = rand::thread_rng().gen_range(0.0, 1.0);
         let mut accumulation = 0.0;
         for i in 0..k {
-            accumulation += (pharamon[i] * visibility[i]) / sum;
+            accumulation += (pheromone[i] * visibility[i]) / sum;
             if accumulation >= rand_f {
                 return i;
             }
@@ -69,7 +69,7 @@ fn select_cluster(visibility: &[f64; MAX_K], pharamon: &[f64; MAX_K], k: usize, 
 }
 
 pub struct ACO {
-    pharamon: Vec<[f64; MAX_K]>,
+    pheromone: Vec<[f64; MAX_K]>,
     state: State,
     k: usize,
     tao0: f64,
@@ -91,7 +91,7 @@ impl ACO {
             }
         };
         ACO {
-            pharamon: state.iter().map(|_| [tao0; MAX_K]).collect(),
+            pheromone: state.iter().map(|_| [tao0; MAX_K]).collect(),
             state, tao0, k,
             r: R,
             l: L,
@@ -105,7 +105,7 @@ impl ACO {
         &self.state
     }
     pub fn get_pharamon(&self) -> &Vec<[f64; MAX_K]> {
-        return &self.pharamon;
+        return &self.pheromone;
     }
     pub fn routine_aco<F>(&mut self, epoch: usize,
         visibility: &Vec<[f64; MAX_K]>, mut cost_estimate: F
@@ -129,7 +129,7 @@ impl ACO {
         for _ in 0..self.r {
             let mut cur_state = self.state.clone();
             for i in 0..self.state.len() {
-                let next = select_cluster(&visibility[i], &self.pharamon[i], self.k, self.q0);
+                let next = select_cluster(&visibility[i], &self.pheromone[i], self.k, self.q0);
                 cur_state[i] = next;
                 // online pharamon update
             }
@@ -148,15 +148,15 @@ impl ACO {
     fn evaporate(&mut self) {
         for i in 0..self.state.len() {
             for j in 0..self.k {
-                let ph = (1.0 - self.rho) * self.pharamon[i][j];
-                self.pharamon[i][j] = ph;
+                let ph = (1.0 - self.rho) * self.pheromone[i][j];
+                self.pheromone[i][j] = ph;
             }
         }
     }
     fn update_pheromon(&mut self, w_state: &WeightedState) {
         for i in 0..w_state.1.len() {
             for j in 0..self.k {
-                let mut ph = self.pharamon[i][j];
+                let mut ph = self.pheromone[i][j];
                 if w_state.1[i] == j {
                     ph += (1.0 / (-w_state.0));
                 }
@@ -165,7 +165,7 @@ impl ACO {
                 } else if ph < self.min_ph {
                     ph = self.min_ph;
                 }
-                self.pharamon[i][j] = ph;
+                self.pheromone[i][j] = ph;
             }
         }
     }
@@ -184,15 +184,40 @@ impl ACO {
             ACOArgsUSize::R => self.r = arg,
         }
     }
+    /// 根據一組鍵值重新排列所有狀態，鍵值亦會被重新排列
+    /// * `state_key` - 所有狀態將會依照此鍵值表重新排列
+    /// * `cmp` - 一個函式。若 cmp(a, b) = true，則 a 會排在 b 前面。
+    pub fn reorder<T: Clone, F: Fn(&T, &T) -> bool>(&mut self, state_key: &mut Vec<T>, cmp: F) {
+        assert_eq!(state_key.len(), self.state.len());
+        let mut tmp_vec = state_key.into_iter().enumerate().map(|(i, sv)| {
+            (i, sv)
+        }).collect::<Vec<_>>();
+        tmp_vec.sort_by(|a, b| {
+            if cmp(&a.1, &b.1) {
+                return std::cmp::Ordering::Less;
+            } else {
+                return std::cmp::Ordering::Greater;
+            }
+        });
+        let mut tmp_state = Vec::<usize>::with_capacity(tmp_vec.len());
+        let mut tmp_ph = Vec::<[f64; MAX_K]>::with_capacity(tmp_vec.len());
+        for i in 0..tmp_vec.len() {
+            tmp_state.push(self.state[tmp_vec[i].0]);
+            tmp_ph.push(self.pheromone[tmp_vec[i].0]);
+        }
+        self.state = tmp_state;
+        self.pheromone = tmp_ph;
+        *state_key = tmp_vec.into_iter().map(|(_, s)| s.clone()).collect();
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
     #[test]
-    fn test_ant_aco() {
+    fn test_ant_aco1() {
         let mut aco = ACO::new(vec![0; 10], 3, None);
-        aco.routine_aco(100, &vec![[1.0; 10]; 10], |state| {
+        aco.routine_aco(300, &vec![[1.0; 10]; 10], |state| {
             let mut cost = 6.0;
             for (i, &s) in state.iter().enumerate() {
                 if i % 2 == 0 {
@@ -204,5 +229,13 @@ mod test {
             cost / 6.0
         });
         assert_eq!(vec![0, 2, 0, 2, 0, 2, 0, 2, 0, 2], *aco.get_state());
+    }
+    #[test]
+    fn test_ant_reorder() {
+        let mut aco = ACO::new(vec![5, 6, 7, 8, 9], 10, None);
+        let mut state_key = vec![0, 1, 2, 4, 3];
+        aco.reorder(&mut state_key, |a, b| a > b);
+        assert_eq!(vec![4, 3, 2, 1, 0], state_key);
+        assert_eq!(vec![8, 9, 7, 6, 5], *aco.get_state());
     }
 }
