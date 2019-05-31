@@ -8,7 +8,7 @@ enum Justify {
 }
 
 pub struct MyMinHeap<P: PartialOrd, K: Hash+Eq+Clone, V=()> {
-    vec: Vec<Box<(K, P, V)>>,
+    vec: Vec<(K, P, V)>,
     table: HashMap<K, usize>
 }
 
@@ -19,12 +19,10 @@ impl <P: PartialOrd, K: Hash+Clone+Eq, V> MyMinHeap<P, K, V> {
             table: HashMap::new()
         }
     }
-    fn swap(&mut self, i1: usize, k1: K, i2: usize, k2: Option<K>) {
+    fn swap(&mut self, i1: usize, i2: usize) {
         if i1 != i2 {
-            self.table.insert(k1, i2);
-            if let Some(k2) = k2 {
-                self.table.insert(k2, i1);
-            }
+            self.table.insert(self.vec[i1].0.clone(), i2);
+            self.table.insert(self.vec[i2].0.clone(), i1);
             self.vec.swap(i1, i2);
         }
     }
@@ -37,12 +35,12 @@ impl <P: PartialOrd, K: Hash+Clone+Eq, V> MyMinHeap<P, K, V> {
                 let right = &self.vec[index * 2 + 2];
                 if right.1 < root.1 && right.1 < left.1 {
                     // 與右手交換
-                    self.swap(index, root.0.clone(), index*2+2, Some(right.0.clone()));
+                    self.swap(index, index*2+2);
                     return Justify::Right;
                 }
             }
             if left.1 < root.1 {
-                self.swap(index, root.0.clone(), index*2 + 1, Some(left.0.clone()));
+                self.swap(index, index*2 + 1);
                 return Justify::Left;
             }
         }
@@ -51,7 +49,7 @@ impl <P: PartialOrd, K: Hash+Clone+Eq, V> MyMinHeap<P, K, V> {
     pub fn push(&mut self, id: K, priority: P, value: V) {
         assert!(!self.contains_key(&id), "MyMinHeap: 欲加入已存在的鍵");
         let mut index = self.vec.len();
-        self.vec.push(Box::new((id.clone(), priority, value)));
+        self.vec.push((id.clone(), priority, value));
         self.table.insert(id, index);
         while index > 0 {
             index = (index - 1) / 2;
@@ -64,11 +62,9 @@ impl <P: PartialOrd, K: Hash+Clone+Eq, V> MyMinHeap<P, K, V> {
         if self.vec.len() == 0 {
             return None;
         }
-        let head = &self.vec[0];
-        let tail = &self.vec[self.vec.len()-1];
-        self.table.remove(&head.0).unwrap();
-        self.swap(self.vec.len() - 1, tail.0.clone(), 0, None);
+        self.swap(self.vec.len() - 1, 0);
         let ret = self.vec.pop().unwrap();
+        self.table.remove(&ret.0);
         let mut index = 0;
         while index < self.vec.len() {
             match self.justify_heap(index) {
@@ -77,7 +73,7 @@ impl <P: PartialOrd, K: Hash+Clone+Eq, V> MyMinHeap<P, K, V> {
                 Justify::Right => index = index * 2,
             }
         }
-        return Some(*ret);
+        return Some(ret);
     }
     pub fn contains_key(&self, id: &K) -> bool {
         return self.table.contains_key(&id);

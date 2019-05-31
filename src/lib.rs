@@ -8,17 +8,16 @@ pub mod algos;
 pub mod util;
 
 use algos::{Flow, AVBType};
-const FLOW_FILE: &str = "flows.json";
 
-pub fn read_flows_from_file() -> Vec<Flow> {
+pub fn read_flows_from_file(base_id: usize, file_name: &str) -> Vec<Flow> {
     let mut flows = vec![];
-    let txt = fs::read_to_string(FLOW_FILE)
-        .expect(&format!("無法讀取{}", FLOW_FILE).as_str());
+    let txt = fs::read_to_string(file_name)
+        .expect(&format!("無法讀取{}", file_name).as_str());
     let all_flows: AllFlows = serde_json::from_str(&txt)
-        .expect(&format!("無法解析{}", FLOW_FILE));
+        .expect(&format!("無法解析{}", file_name));
     for flow in all_flows.tt_flows.iter() {
         flows.push(Flow::TT {
-            id: flows.len(),
+            id: flows.len() + base_id,
             size: flow.size,
             src: flow.src,
             dst: flow.dst,
@@ -29,7 +28,7 @@ pub fn read_flows_from_file() -> Vec<Flow> {
     }
     for flow in all_flows.avb_flows.iter() {
         flows.push(Flow::AVB {
-            id: flows.len(),
+            id: flows.len() + base_id,
             size: flow.size,
             src: flow.src,
             dst: flow.dst,
@@ -38,8 +37,10 @@ pub fn read_flows_from_file() -> Vec<Flow> {
             avb_type: {
                 if flow.avb_type == 'A' {
                     AVBType::new_type_a()
-                } else {
+                } else if flow.avb_type == 'B' {
                     AVBType::new_type_b()
+                } else {
+                    panic!("AVB type 必需為 `A` 或 `B`");
                 }
             }
         });

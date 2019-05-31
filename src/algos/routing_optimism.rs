@@ -52,7 +52,7 @@ impl <'a> RO<'a> {
                     cost += W1*c1 + W2*c2 + W3*c3;
                 }
             });
-            println!("{:?}", cost);
+            //println!("{:?}", cost);
             i += 1;
         }
         println!("{}", i);
