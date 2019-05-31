@@ -56,9 +56,9 @@ impl AVBType {
 build_shared_enum! { 
     Flow {
         id: usize,
+        size: u32,
         src: usize,
         dst: usize,
-        size: u32,
         period: u32,
         max_delay: u32
     },
@@ -149,7 +149,7 @@ pub use routing_optimism::RO;
 mod aco;
 pub use aco::ACO;
 
-pub mod cost_estimate;
+pub mod time_estimate;
 
 #[cfg(test)]
 mod test {

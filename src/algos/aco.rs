@@ -158,7 +158,7 @@ impl ACO {
             for j in 0..self.k {
                 let mut ph = self.pheromone[i][j];
                 if w_state.1[i] == j {
-                    ph += (1.0 / (-w_state.0));
+                    ph += 1.0 / (-w_state.0);
                 }
                 if ph > self.max_ph {
                     ph = self.max_ph;

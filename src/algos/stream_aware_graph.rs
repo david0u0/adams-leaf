@@ -30,7 +30,7 @@ pub struct StreamAwareGraph {
     cur_edge_id: usize,
     inactive_edges: Vec<(usize, usize)>,
     inactive_nodes: Vec<usize>,
-    edge_info: HashMap<(usize, usize), (usize, HashSet<usize>)>
+    edge_info: HashMap<(usize, usize), (usize, HashSet<usize>, f64)>
 }
 impl StreamAwareGraph {
     fn _add_node(&mut self, cnt: Option<usize>, is_switch: bool) -> Vec<usize> {
@@ -59,8 +59,9 @@ impl StreamAwareGraph {
     fn _check_exist(&self, id: usize) -> bool {
         return id < self.nodes.len() && self.nodes[id].exist;
     }
-    fn _add_single_edge(&mut self, id_pair: (usize, usize), bandwidth: f64) {
-        self.nodes[id_pair.0].edges.insert(id_pair.1, (bandwidth, true));
+    fn _add_single_edge(&mut self, id: usize, node_pair: (usize, usize), bandwidth: f64) {
+        self.nodes[node_pair.0].edges.insert(node_pair.1, (bandwidth, true));
+        self.edge_info.insert(node_pair, (id, HashSet::new(), bandwidth));
     }
     fn _del_single_edge(&mut self, id_pair: (usize, usize)) -> Result<f64, String> {
         if let Some(e) = self.nodes[id_pair.0].edges.remove(&id_pair.1) {
@@ -116,10 +117,8 @@ impl Graph<usize> for StreamAwareGraph {
     fn add_edge(&mut self, id_pair: (usize, usize), bandwidth: f64) -> Result<usize, String> {
         if self._check_exist(id_pair.0) && self._check_exist(id_pair.1) {
             let edge_id = self.cur_edge_id;
-            self._add_single_edge(id_pair, bandwidth);
-            self._add_single_edge((id_pair.1, id_pair.0), bandwidth);
-            self.edge_info.insert((id_pair.1, id_pair.0), (edge_id, HashSet::new()));
-            self.edge_info.insert(id_pair, (edge_id, HashSet::new()));
+            self._add_single_edge(edge_id, id_pair, bandwidth);
+            self._add_single_edge(edge_id+1, (id_pair.1, id_pair.0), bandwidth);
             self.edge_cnt += 1;
             self.cur_edge_id += 2;
             return Ok(edge_id);
@@ -228,7 +227,7 @@ impl StreamAwareGraph {
     /// * `route` - 該路徑
     pub fn save_flowid_on_edge(&mut self, remember: bool, flow_id: usize, route: &Vec<usize>) {
         for i in 0..route.len()-1 {
-            let (_, set) = self.edge_info.get_mut(&(route[i], route[i+1])).unwrap();
+            let (_, set, _) = self.edge_info.get_mut(&(route[i], route[i+1])).unwrap();
             if remember {
                 set.insert(flow_id);
             } else {
@@ -242,28 +241,27 @@ impl StreamAwareGraph {
     pub fn get_overlap_flows(&self, route: &Vec<usize>) -> Vec<Vec<usize>> {
         let mut ret = Vec::with_capacity(route.len()-1);
         for i in 0..route.len()-1 {
-            let (_, set) = self.edge_info.get(&(route[i], route[i+1])).unwrap();
+            let (_, set, _) = self.edge_info.get(&(route[i], route[i+1])).unwrap();
             ret.push(set.iter().map(|id| *id).collect());
         }
         ret
     }
-    pub fn get_edge_ids(&self, route: &Vec<usize>) -> Vec<usize> {
-        let mut vec: Vec<usize> = vec![];
+    pub fn get_edges_id_bandwidth(&self, route: &Vec<usize>) -> Vec<(usize, f64)> {
+        let mut vec = vec![];
         for i in 0..route.len()-1 {
-            if let Some((edge_id, _)) = self.edge_info.get(&(route[i], route[i+1])) {
-                vec.push(*edge_id);
+            if let Some((edge_id, _, bandwidth)) = self.edge_info.get(&(route[i], route[i+1])) {
+                vec.push((*edge_id, *bandwidth));
             } else {
                 panic!("get_link_ids: 不連通的路徑");
             }
         }
-        return vec;
+        vec
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::network_struct::*;
     #[test]
     fn test_remember_forget_flow() -> Result<(), String> {
         let mut g = StreamAwareGraph::new();

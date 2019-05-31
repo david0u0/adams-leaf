@@ -1,7 +1,5 @@
-use crate::network_struct::Graph;
 use crate::util::Dijkstra;
 use super::{StreamAwareGraph, RouteTable, Flow, RoutingAlgo, GCL};
-use super::cost_estimate;
 
 pub struct RO<'a> {
     g: StreamAwareGraph,
@@ -11,10 +9,10 @@ pub struct RO<'a> {
 }
 
 impl <'a> RO<'a> {
-    pub fn new(g: &'a StreamAwareGraph, hyper_p: usize) -> Self {
+    pub fn new(g: &'a StreamAwareGraph, hyper_p: usize, gcl: GCL) -> Self {
         return RO {
+            gcl,
             g: g.clone(),
-            gcl: GCL::new(hyper_p, g.get_edge_cnt()),
             route_table: RouteTable::new(),
             dijkstra_algo: Dijkstra::new(g),
         };
