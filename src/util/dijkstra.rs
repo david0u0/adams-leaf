@@ -48,17 +48,6 @@ impl <'a, K: Hash+Eq+Copy, G: Graph<K>> Dijkstra<'a, K, G> {
             });
         }
     }
-    pub fn get_dist(&mut self, src_id: K, dst_id: K) -> f64 {
-        if !self.routed_node_table.contains_key(&src_id) {
-            self.compute_route(src_id);
-        }
-        if let Some(entry) = self.final_dist_map.get(&(src_id, dst_id)) {
-            return entry.0;
-        } else {
-            // NOTE: 路徑無法連通
-            return std::f64::MAX;
-        }
-    }
     pub fn get_route(&mut self, src_id: K, dst_id: K) -> Option<(f64, Vec<K>)> {
         if !self.routed_node_table.contains_key(&src_id) {
             self.compute_route(src_id);

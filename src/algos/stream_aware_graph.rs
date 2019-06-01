@@ -176,10 +176,10 @@ impl Graph<usize> for StreamAwareGraph {
             if let Some((bandwidth, _)) = self.nodes[cur].edges.get(&next) {
                 dist += 1.0 / bandwidth;
             } else {
-                return std::f64::MAX;
+                panic!("嘗試對一條走不通的路徑取距離");
             }
         }
-        return dist;
+        dist
     }
 }
 impl OnOffGraph<usize> for StreamAwareGraph {

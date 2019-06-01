@@ -107,6 +107,7 @@ impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
         cur_path: Rc<Vec<K>>,
         mut callback: impl FnMut(f64, Vec<K>) -> ()
     ) {
+        let last_node = *cur_path.last().unwrap();
         let mut prefix: Vec<K> = vec![];
         for i in 0..cur_path.len()-1 {
             let cur_node = cur_path[i];
@@ -120,12 +121,13 @@ impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
             }
             // TODO 這裡是不是有優化的空間?
             let mut spf = Dijkstra::new(&self.g);
-            if let Some((_, postfix)) = spf.get_route(cur_node, *cur_path.last().unwrap()) {
+            if let Some((d, postfix)) = spf.get_route(cur_node, last_node) {
                 let mut next_path = prefix.clone();
                 next_path.extend(postfix);
-                callback(self.g.get_dist(&next_path), next_path);
-                prefix.push(cur_node);
+                let dist = self.g.get_dist(&next_path);
+                callback(dist, next_path);
             }
+            prefix.push(cur_node);
         }
         self.g.reset();
     }

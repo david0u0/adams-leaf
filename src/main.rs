@@ -22,6 +22,8 @@ fn main() -> Result<(), String> {
     algo.compute_routes(flows);
     println!("{:?}", algo.get_route(1));
     println!("{:?}", algo.get_route(0));
+    println!("{:?}", algo.get_route(2));
+    println!("{:?}", algo.get_route(3));
 
     return Ok(());
 }
