@@ -1,6 +1,6 @@
 use crate::util::YensAlgo;
 use super::{StreamAwareGraph, FlowTable, Flow, RoutingAlgo, GCL};
-use super::time_estimate::compute_avb_latency;
+use super::time_and_tide::compute_avb_latency;
 
 const K: usize = 10;
 const T_LIMIT: u128 = 1000 * 100; // micro_sec
@@ -29,18 +29,18 @@ impl <'a> RO<'a> {
 
 impl <'a> RO<'a> {
     /// 在所有 TT 都被排定的狀況下去執行爬山算法
-    fn hill_climbing(&self) {
+    fn grasp(&mut self) {
         let time = std::time::Instant::now();
-        let tmp_flow_table = self.flow_table.clone();
         let mut iter_times = 0;
         while time.elapsed().as_micros() < T_LIMIT {
             let mut cost = 0.0;
             self.flow_table.foreach_flow(|flow| {
                 if let Flow::AVB { id, max_delay, .. } = *flow {
+                    let route = self.get_kth_route(flow, *self.flow_table.get_info(id));
                     let latency = compute_avb_latency(
                         &self.g,
                         flow,
-                        self.get_kth_route(flow, *tmp_flow_table.get_info(id)),
+                        route,
                         &self.flow_table,
                         &self.gcl
                     ) as f64;
@@ -72,7 +72,7 @@ impl <'a> RoutingAlgo for RO<'a> {
             self.g.save_flowid_on_edge(true, *flow.id(), r);
             self.flow_table.insert(flow, 0);
         }
-        self.hill_climbing();
+        self.grasp();
     }
     fn get_retouted_flows(&self) -> &Vec<usize> {
         unimplemented!();

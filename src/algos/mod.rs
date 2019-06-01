@@ -183,7 +183,7 @@ pub use routing_optimism::RO;
 mod aco;
 pub use aco::ACO;
 
-pub mod time_estimate;
+pub mod time_and_tide;
 
 #[cfg(test)]
 mod test {
