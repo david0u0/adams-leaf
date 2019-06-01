@@ -39,7 +39,7 @@ macro_rules! build_shared_enum {
     };
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct AVBType(bool);
 impl AVBType {
     pub fn new_type_a() -> Self {
@@ -50,6 +50,9 @@ impl AVBType {
     }
     pub fn is_type_a(&self) -> bool {
         return self.0;
+    }
+    pub fn is_type_b(&self) -> bool {
+        return !self.0;
     }
 }
 
