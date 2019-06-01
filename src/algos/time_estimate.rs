@@ -48,11 +48,12 @@ fn tt_interfere_avb_single_link(link_id: usize, wcd: f64, gcl: &GCL) -> usize {
     let all_gce = gcl.get_close_event(link_id);
     for mut j in 0..all_gce.len() {
         let (mut i_cur, mut rem) = (0, wcd as i32);
-        let gce_ptr = all_gce[j];
         while rem >= 0 {
+            let gce_ptr = all_gce[j];
             i_cur += gce_ptr.1;
             j += 1;
             if j == all_gce.len() {
+                // TODO 應該要循環？
                 break;
             }
             let gce_ptr_next = all_gce[j];
@@ -72,7 +73,7 @@ mod test {
         let mut g = StreamAwareGraph::new();
         g.add_host(Some(3));
         g.add_edge((0, 1), 100.0).unwrap();
-        g.add_edge((2, 1), 100.0).unwrap();
+        g.add_edge((1, 2), 100.0).unwrap();
         let flows = vec![
             Flow::AVB {
                 id: 0, 
@@ -98,6 +99,17 @@ mod test {
         (g, flows, flow_table, gcl)
     }
     #[test]
+    fn test_single_link_avb() {
+        let (_, flows, mut route_table, _) = init_settings();
+        route_table.insert(flows[0].clone(), 0);
+        assert_eq!(wcd_on_single_link(0, 75, 100.0, &route_table, &vec![]),
+            (MAX_BE_SIZE/100.0 + 1.0));
+
+        route_table.insert(flows[1].clone(), 0);
+        assert_eq!(wcd_on_single_link(0, 75, 100.0, &route_table, &vec![1]),
+            (MAX_BE_SIZE/100.0 + 1.0 + 2.0));
+    }
+    #[test]
     fn test_endtoend_avb_without_gcl() {
         let (mut g, flows, mut flow_table, gcl) = init_settings();
         flow_table.insert(flows[0].clone(), 0);
@@ -111,14 +123,24 @@ mod test {
             (MAX_BE_SIZE/100.0 + 1.0 + 2.0) * 2.0);
     }
     #[test]
-    fn test_single_link_avb() {
-        let (_, flows, mut route_table, _) = init_settings();
-        route_table.insert(flows[0].clone(), 0);
-        assert_eq!(wcd_on_single_link(0, 75, 100.0, &route_table, &vec![]),
-            (MAX_BE_SIZE/100.0 + 1.0));
+    fn test_endtoend_avb_with_gcl() { // 其實已經接近整合測試了 @@
+        let (mut g, flows, mut flow_table, mut gcl) = init_settings();
 
-        route_table.insert(flows[1].clone(), 0);
-        assert_eq!(wcd_on_single_link(0, 75, 100.0, &route_table, &vec![1]),
-            (MAX_BE_SIZE/100.0 + 1.0 + 2.0));
+        flow_table.insert(flows[0].clone(), 0);
+        g.save_flowid_on_edge(true, 0, &vec![0, 1, 2]);
+        flow_table.insert(flows[1].clone(), 0);
+        g.save_flowid_on_edge(true, 1, &vec![0, 1, 2]);
+
+        gcl.insert_close_event(0, 0, 10);
+        assert_eq!(compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
+            (MAX_BE_SIZE/100.0 + 1.0 + 2.0) * 2.0 + 10.0);
+
+        gcl.insert_close_event(0, 15, 5);
+        assert_eq!(compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
+            (MAX_BE_SIZE/100.0 + 1.0 + 2.0) * 2.0 + 15.0);
+
+        gcl.insert_close_event(2, 100, 100);
+        assert_eq!(compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
+            (MAX_BE_SIZE/100.0 + 1.0 + 2.0) * 2.0 + 115.0);
     }
 }

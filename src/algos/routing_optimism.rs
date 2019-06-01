@@ -32,6 +32,7 @@ impl <'a> RO<'a> {
     fn hill_climbing(&self) {
         let time = std::time::Instant::now();
         let tmp_flow_table = self.flow_table.clone();
+        let mut iter_times = 0;
         while time.elapsed().as_micros() < T_LIMIT {
             let mut cost = 0.0;
             self.flow_table.foreach_flow(|flow| {
@@ -53,8 +54,10 @@ impl <'a> RO<'a> {
                     cost += W1*c1 + W2*c2 + W3*c3;
                 }
             });
-            // println!("{:?}", cost);
+            iter_times += 1;
+            println!("{:?}", cost);
         }
+        println!("{}", iter_times);
     }
     fn get_kth_route(&self, flow: &Flow, k: usize) -> &Vec<usize> {
         self.yens_algo.get_kth_route(*flow.src(), *flow.dst(), k)
