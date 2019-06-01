@@ -62,3 +62,63 @@ fn tt_interfere_avb_single_link(link_id: usize, wcd: f64, gcl: &GCL) -> usize {
     }
     return i_max;
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use super::super::*;
+    use crate::network_struct::*;
+    fn init_settings() -> (StreamAwareGraph, Vec<Flow>, FlowTable<usize>, GCL) {
+        let mut g = StreamAwareGraph::new();
+        g.add_host(Some(3));
+        g.add_edge((0, 1), 100.0).unwrap();
+        g.add_edge((2, 1), 100.0).unwrap();
+        let flows = vec![
+            Flow::AVB {
+                id: 0, 
+                src: 0,
+                dst: 2,
+                size: 75,
+                period: 10000,
+                max_delay: 200.0,
+                avb_type: AVBType::new_type_a()
+            },
+            Flow::AVB {
+                id: 1, 
+                src: 0,
+                dst: 2,
+                size: 150,
+                period: 10000,
+                max_delay: 200.0,
+                avb_type: AVBType::new_type_a()
+            }
+        ];
+        let flow_table = FlowTable::new();
+        let gcl = GCL::new(10, g.get_edge_cnt());
+        (g, flows, flow_table, gcl)
+    }
+    #[test]
+    fn test_endtoend_avb_without_gcl() {
+        let (mut g, flows, mut flow_table, gcl) = init_settings();
+        flow_table.insert(flows[0].clone(), 0);
+        g.save_flowid_on_edge(true, 0, &vec![0, 1, 2]);
+        assert_eq!(compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
+            (MAX_BE_SIZE/100.0 + 1.0) * 2.0);
+
+        flow_table.insert(flows[1].clone(), 0);
+        g.save_flowid_on_edge(true, 1, &vec![0, 1, 2]);
+        assert_eq!(compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
+            (MAX_BE_SIZE/100.0 + 1.0 + 2.0) * 2.0);
+    }
+    #[test]
+    fn test_single_link_avb() {
+        let (_, flows, mut route_table, _) = init_settings();
+        route_table.insert(flows[0].clone(), 0);
+        assert_eq!(wcd_on_single_link(0, 75, 100.0, &route_table, &vec![]),
+            (MAX_BE_SIZE/100.0 + 1.0));
+
+        route_table.insert(flows[1].clone(), 0);
+        assert_eq!(wcd_on_single_link(0, 75, 100.0, &route_table, &vec![1]),
+            (MAX_BE_SIZE/100.0 + 1.0 + 2.0));
+    }
+}
