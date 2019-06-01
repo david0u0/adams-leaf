@@ -242,8 +242,11 @@ impl StreamAwareGraph {
         // TODO 回傳的 Vec<Vec> 有優化空間
         let mut ret = Vec::with_capacity(route.len()-1);
         for i in 0..route.len()-1 {
-            let (_, set, _) = self.edge_info.get(&(route[i], route[i+1])).unwrap();
-            ret.push(set.iter().map(|id| *id).collect());
+            if let Some((_, set, _)) = self.edge_info.get(&(route[i], route[i+1])) {
+                ret.push(set.iter().map(|id| *id).collect());
+            } else {
+                panic!("{} {} 之間沒有連線", route[i], route[i + 1]);
+            }
         }
         ret
     }

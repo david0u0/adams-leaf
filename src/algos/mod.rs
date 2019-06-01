@@ -136,10 +136,16 @@ mod helper_struct {
                 panic!("更新路徑時發現資料流不存在");
             }
         }
-        pub fn foreach_flow(&self, mut callback: impl FnMut(&Flow)) {
+        pub fn foreach_flow(&self, is_avb: bool, mut callback: impl FnMut(&Flow)) {
             for maybe_flow in self.vec.iter() {
                 if let Some((flow, _, _)) = maybe_flow {
-                    callback(flow);
+                    if let Flow::AVB { .. } = flow {
+                        if is_avb {
+                            callback(flow);
+                        }
+                    } else if !is_avb {
+                        callback(flow);
+                    }
                 } else {
                     break;
                 }

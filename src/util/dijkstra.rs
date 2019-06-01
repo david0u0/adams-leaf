@@ -59,25 +59,25 @@ impl <'a, K: Hash+Eq+Copy, G: Graph<K>> Dijkstra<'a, K, G> {
             return std::f64::MAX;
         }
     }
-    pub fn get_route(&mut self, src_id: K, dst_id: K) -> (f64, Vec<K>) {
+    pub fn get_route(&mut self, src_id: K, dst_id: K) -> Option<(f64, Vec<K>)> {
         if !self.routed_node_table.contains_key(&src_id) {
             self.compute_route(src_id);
         }
         if let Some(entry) = self.final_dist_map.get(&(src_id, dst_id)) {
-            return (entry.0, self._recursive_get_route(src_id, dst_id));
+            Some((entry.0, self._recursive_get_route(src_id, dst_id)))
         } else {
             // NOTE: 路徑無法連通
-            return (std::f64::MAX, vec![src_id, dst_id]);
+            None
         }
     }
     fn _recursive_get_route(&self, src_id: K, dst_id: K) -> Vec<K> {
         if src_id == dst_id {
-            return vec![src_id];
+            vec![src_id]
         } else {
             let prev_id = self.final_dist_map.get(&(src_id, dst_id)).unwrap().1.get();
             let mut path = self._recursive_get_route(src_id, prev_id);
             path.push(dst_id);
-            return path;
+            path
         }
     }
 }
@@ -96,8 +96,8 @@ mod test {
         g.add_edge((1, 2), 20.0)?;
         g.add_edge((0, 2), 2.0)?;
         let mut algo = Dijkstra::new(&g);
-        assert_eq!(vec![0, 1, 2], algo.get_route(0, 2).1);
-        return Ok(());
+        assert_eq!(vec![0, 1, 2], algo.get_route(0, 2).unwrap().1);
+        Ok(())
     }
     #[test]
     fn test_dijkstra2() -> Result<(), String> {
@@ -111,14 +111,14 @@ mod test {
         g.add_edge((3, 4), 3.0)?;
 
         let mut algo = Dijkstra::new(&g);
-        assert_eq!(vec![0, 1, 3, 4], algo.get_route(0, 4).1);
-        assert_eq!(vec![2, 1, 3, 4], algo.get_route(2, 4).1);
-        assert_eq!(std::f64::MAX, algo.get_route(0, 5).0);
+        assert_eq!(vec![0, 1, 3, 4], algo.get_route(0, 4).unwrap().1);
+        assert_eq!(vec![2, 1, 3, 4], algo.get_route(2, 4).unwrap().1);
+        assert!(algo.get_route(0, 5).is_none());
 
         let mut g = g.clone();
         g.add_edge((4, 5), 2.0)?;
         let mut algo = Dijkstra::new(&g);
-        assert_eq!(vec![0, 1, 3, 4, 5], algo.get_route(0, 5).1);
-        return Ok(());
+        assert_eq!(vec![0, 1, 3, 4, 5], algo.get_route(0, 5).unwrap().1);
+        Ok(())
     }
 }

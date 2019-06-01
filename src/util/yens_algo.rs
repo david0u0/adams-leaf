@@ -33,7 +33,7 @@ impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
     }
     /// 回歸普通的 Dijkstra 算法
     pub fn get_shortest_route(&mut self, src: K, dst: K) -> Path<K> {
-        self.dijkstra_algo.get_route(src, dst)
+        self.dijkstra_algo.get_route(src, dst).expect("連一條路都沒有！！？")
     }
     pub fn get_route_count(&self, src: K, dst: K) -> usize {
         let pair = (src, dst);
@@ -59,7 +59,7 @@ impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
         let mut paths: HashMap<Rc<Vec<K>>, f64> = HashMap::new();
         let mut visited_edges: HashMap<K, HashSet<K>> = HashMap::new();
         let mut min_heap: MyMinHeap<f64, Rc<Vec<K>>> = MyMinHeap::new();
-        let shortest = self.dijkstra_algo.get_route(src, dst);
+        let shortest = self.dijkstra_algo.get_route(src, dst).expect("竟然連一條路都沒有！！？");
         min_heap.push(Rc::new(shortest.1), shortest.0, ());
         while let Some((cur_path, dist, _)) = min_heap.pop() {
             paths.insert(cur_path.clone(), dist);
@@ -120,11 +120,12 @@ impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
             }
             // TODO 這裡是不是有優化的空間?
             let mut spf = Dijkstra::new(&self.g);
-            let (_, postfix) = spf.get_route(cur_node, *cur_path.last().unwrap());
-            let mut next_path = prefix.clone();
-            next_path.extend(postfix);
-            callback(self.g.get_dist(&next_path), next_path);
-            prefix.push(cur_node);
+            if let Some((_, postfix)) = spf.get_route(cur_node, *cur_path.last().unwrap()) {
+                let mut next_path = prefix.clone();
+                next_path.extend(postfix);
+                callback(self.g.get_dist(&next_path), next_path);
+                prefix.push(cur_node);
+            }
         }
         self.g.reset();
     }
