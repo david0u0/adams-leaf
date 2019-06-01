@@ -1,8 +1,8 @@
 use crate::util::Dijkstra;
-use super::{StreamAwareGraph, RouteTable, Flow, RoutingAlgo};
+use super::{StreamAwareGraph, FlowTable, Flow, RoutingAlgo};
 
 pub struct SPF<'a> {
-    route_table: RouteTable,
+    flow_table: FlowTable<Vec<usize>>,
     dijkstra_algo: Dijkstra<'a, usize, StreamAwareGraph>,
     rerouted: Vec<usize>,
 }
@@ -11,7 +11,7 @@ impl <'a> SPF<'a> {
     pub fn new(g: &'a StreamAwareGraph) -> Self {
         return SPF {
             rerouted: vec![],
-            route_table: RouteTable::new(),
+            flow_table: FlowTable::new(),
             dijkstra_algo: Dijkstra::new(g),
         };
     }
@@ -22,10 +22,10 @@ impl <'a> RoutingAlgo for SPF<'a> {
         for flow in flows.into_iter() {
             if let Flow::AVB { src, dst, .. } = flow {
                 let r = self.dijkstra_algo.get_route(src, dst);
-                self.route_table.insert(flow, r.0, r.1);
+                self.flow_table.insert(flow, r.1);
             } else if let Flow::TT { src, dst, .. } = flow {
                 let r = self.dijkstra_algo.get_route(src, dst);
-                self.route_table.insert(flow, r.0, r.1);
+                self.flow_table.insert(flow, r.1);
             }
         }
     }
@@ -33,6 +33,6 @@ impl <'a> RoutingAlgo for SPF<'a> {
         return &self.rerouted;
     }
     fn get_route(&self, id: usize) -> &Vec<usize> {
-        return self.route_table.get_route(id);
+        return self.flow_table.get_info(id);
     }
 }

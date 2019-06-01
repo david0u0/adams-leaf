@@ -15,6 +15,7 @@ type Path<K> = (f64, Vec<K>);
 pub struct YensAlgo<'a, K: Hash+Eq+Copy, G: OnOffGraph<K>> {
     g: G,
     k: usize,
+    // TODO 這個 Vec<Path> 的結構是兩層向量，有優化空間
     route_table: HashMap<(K, K), Vec<Path<K>>>,
     dijkstra_algo: Dijkstra<'a, K, G>,
     rng: ThreadRng,
@@ -34,13 +35,21 @@ impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
     pub fn get_shortest_route(&mut self, src: K, dst: K) -> Path<K> {
         self.dijkstra_algo.get_route(src, dst)
     }
-    // TODO 這個 Vec<Path> 的結構是兩層向量，有優化空間
-    pub fn get_routes(&mut self, src: K, dst: K) -> &Vec<Path<K>> {
+    pub fn get_route_count(&self, src: K, dst: K) -> usize {
         let pair = (src, dst);
-        if !self.route_table.contains_key(&pair) {
-            self.compute_routes(src, dst);
+        if let Some(paths) = &self.route_table.get(&pair) {
+            paths.len()
+        } else {
+            panic!("先運行 compute_routes");
         }
-        return self.route_table.get(&pair).unwrap();
+    }
+    pub fn get_kth_route(&self, src: K, dst: K, k: usize) -> &Vec<K> {
+        let pair = (src, dst);
+        if let Some(paths) = self.route_table.get(&pair) {
+            &paths[k].1
+        } else {
+            panic!("先運行 compute_routes");
+        }
     }
     pub fn compute_routes(&mut self, src: K, dst: K) {
         if self.route_table.contains_key(&(src, dst)) {
@@ -146,11 +155,12 @@ mod test {
         }
 
         let mut algo = YensAlgo::new(&g, 10);
-        assert_eq!(vec![0, 1, 2], algo.get_routes(0, 2)[0].1);
-        assert_eq!(vec![0, 1, 3, 2], algo.get_routes(0, 2)[1].1);
-        assert_eq!(vec![0, 1, 4, 2], algo.get_routes(0, 2)[2].1);
-        assert_eq!(4, algo.get_routes(0, 2).len());
+        assert_eq!(&vec![0, 1, 2], algo.get_kth_route(0, 2, 0));
+        assert_eq!(&vec![0, 1, 3, 2], algo.get_kth_route(0, 2, 1));
+        assert_eq!(&vec![0, 1, 4, 2], algo.get_kth_route(0, 2, 2));
+        assert_eq!(4, algo.get_route_count(0, 2));
 
+/*
         assert_eq!(vec![0, 1, 4, 99], algo.get_routes(0, 99)[0].1);
         assert_eq!(vec![0, 1, 4, 98, 99], algo.get_routes(0, 99)[1].1);
         assert_eq!(vec![0, 1, 4, 97, 99], algo.get_routes(0, 99)[2].1);
@@ -162,7 +172,7 @@ mod test {
         assert_eq!(vec![0, 1, 4, 99, 98, 5], algo.get_routes(0, 5)[3].1);
         assert_eq!(vec![0, 1, 4, 98, 99, 5], algo.get_routes(0, 5)[4].1);
         assert_eq!(10, algo.get_routes(0, 5).len());
-
+*/
         return Ok(());
     }
 }

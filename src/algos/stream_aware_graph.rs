@@ -119,7 +119,7 @@ impl Graph<usize> for StreamAwareGraph {
             let edge_id = self.cur_edge_id;
             self._add_single_edge(edge_id, id_pair, bandwidth);
             self._add_single_edge(edge_id+1, (id_pair.1, id_pair.0), bandwidth);
-            self.edge_cnt += 1;
+            self.edge_cnt += 2;
             self.cur_edge_id += 2;
             return Ok(edge_id);
         } else {
@@ -239,6 +239,7 @@ impl StreamAwareGraph {
     /// 
     /// __注意：方向不同者不視為共用！__
     pub fn get_overlap_flows(&self, route: &Vec<usize>) -> Vec<Vec<usize>> {
+        // TODO 回傳的 Vec<Vec> 有優化空間
         let mut ret = Vec::with_capacity(route.len()-1);
         for i in 0..route.len()-1 {
             let (_, set, _) = self.edge_info.get(&(route[i], route[i+1])).unwrap();

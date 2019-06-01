@@ -1,5 +1,5 @@
 use crate::util::YensAlgo;
-use super::{StreamAwareGraph, RouteTable, Flow, RoutingAlgo, GCL};
+use super::{StreamAwareGraph, FlowTable, Flow, RoutingAlgo, GCL};
 use super::time_estimate::compute_avb_latency;
 
 const K: usize = 10;
@@ -11,7 +11,7 @@ const W3: f64 = 1.0;
 
 pub struct RO<'a> {
     g: StreamAwareGraph,
-    route_table: RouteTable,
+    flow_table: FlowTable<usize>,
     yens_algo: YensAlgo<'a, usize, StreamAwareGraph>,
     gcl: GCL,
 }
@@ -21,7 +21,7 @@ impl <'a> RO<'a> {
         return RO {
             gcl,
             g: g.clone(),
-            route_table: RouteTable::new(),
+            flow_table: FlowTable::new(),
             yens_algo: YensAlgo::new(g, K),
         };
     }
@@ -31,15 +31,16 @@ impl <'a> RO<'a> {
     /// 在所有 TT 都被排定的狀況下去執行爬山算法
     fn hill_climbing(&self) {
         let time = std::time::Instant::now();
-        let mut i = 0;
+        let tmp_flow_table = self.flow_table.clone();
         while time.elapsed().as_micros() < T_LIMIT {
             let mut cost = 0.0;
-            self.route_table.foreach_flow(|flow| {
-                if let Flow::AVB { max_delay, .. } = *flow {
+            self.flow_table.foreach_flow(|flow| {
+                if let Flow::AVB { id, max_delay, .. } = *flow {
                     let latency = compute_avb_latency(
                         &self.g,
                         flow,
-                        &self.route_table,
+                        self.get_kth_route(flow, *tmp_flow_table.get_info(id)),
+                        &self.flow_table,
                         &self.gcl
                     ) as f64;
                     let c1 = if latency > max_delay {
@@ -52,33 +53,30 @@ impl <'a> RO<'a> {
                     cost += W1*c1 + W2*c2 + W3*c3;
                 }
             });
-            //println!("{:?}", cost);
-            i += 1;
+            // println!("{:?}", cost);
         }
-        println!("{}", i);
+    }
+    fn get_kth_route(&self, flow: &Flow, k: usize) -> &Vec<usize> {
+        self.yens_algo.get_kth_route(*flow.src(), *flow.dst(), k)
     }
 }
 
 impl <'a> RoutingAlgo for RO<'a> {
     fn compute_routes(&mut self, flows: Vec<Flow>) {
         for flow in flows.into_iter() {
-            if let Flow::AVB { id, src, dst, .. } = flow {
-                let rs = self.yens_algo.get_routes(src, dst);
-                self.g.save_flowid_on_edge(true, id, &rs[0].1);
-                self.route_table.insert(flow, rs[0].0, rs[0].1.clone());
-            } else if let Flow::TT { id, src, dst, .. } = flow {
-                let r = self.yens_algo.get_shortest_route(src, dst);
-                self.g.save_flowid_on_edge(true, id, &r.1);
-                self.route_table.insert(flow, r.0, r.1);
-                // TODO 計算GCL
-            }
+            let r = self.yens_algo.compute_routes(*flow.src(), *flow.dst());
+            let r = self.yens_algo.get_kth_route(*flow.src(), *flow.dst(), 0);
+            self.g.save_flowid_on_edge(true, *flow.id(), r);
+            self.flow_table.insert(flow, 0);
         }
         self.hill_climbing();
     }
     fn get_retouted_flows(&self) -> &Vec<usize> {
-        panic!("Not implemented!");
+        unimplemented!();
     }
     fn get_route(&self, id: usize) -> &Vec<usize> {
-        return self.route_table.get_route(id);
+        let k = *self.flow_table.get_info(id);
+        let flow = self.flow_table.get_flow(id);
+        self.get_kth_route(flow, k)
     }
 }

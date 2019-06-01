@@ -79,12 +79,13 @@ pub trait RoutingAlgo {
 mod helper_struct {
     use super::{Flow};
     pub const MAX_FLOW_ID: usize = 9999;
-    pub struct RouteTable {
-        vec: Vec<Option<(Flow, f64, Vec<usize>)>>
+    #[derive(Clone)]
+    pub struct FlowTable<T: Clone> {
+        vec: Vec<Option<(Flow, f64, T)>>
     }
-    impl RouteTable {
+    impl <T: Clone> FlowTable<T> {
         pub fn new() -> Self {
-            return RouteTable { vec: vec![None; MAX_FLOW_ID] };
+            return FlowTable { vec: vec![None; MAX_FLOW_ID] };
         }
         pub fn get_flow(&self, id: usize) -> &Flow {
             if let Some(t) = &self.vec[id] {
@@ -98,7 +99,7 @@ mod helper_struct {
             }
             panic!("該資料流不存在");
         }
-        pub fn get_route(&self, id: usize) -> &Vec<usize> {
+        pub fn get_info(&self, id: usize) -> &T {
             if let Some(t) = &self.vec[id] {
                 return &t.2;
             }
@@ -110,12 +111,27 @@ mod helper_struct {
             }
             panic!("該資料流不存在");
         }
-        pub fn insert(&mut self, flow: Flow, cost: f64, route: Vec<usize>) {
+        pub fn insert(&mut self, flow: Flow, info: T) {
             let id = *flow.id();
             if let Some(_) = self.vec[id] {
                 panic!("插入資料流時發現該資料流已存在");
             }
-            self.vec[id] = Some((flow, cost, route));
+            self.vec[id] = Some((flow, 0.0, info));
+        }
+        pub fn update_cost(&mut self, id: usize, cost: f64) {
+            if let Some(entry) = &mut self.vec[id] {
+                entry.1 = cost;
+            } else {
+                panic!("更新成本時發現資料流不存在");
+            }
+        }
+        pub fn update_info(&mut self, id: usize, cost: f64, info: T) {
+            if let Some(entry) = &mut self.vec[id] {
+                entry.1 = cost;
+                entry.2 = info;
+            } else {
+                panic!("更新路徑時發現資料流不存在");
+            }
         }
         pub fn foreach_flow(&self, mut callback: impl FnMut(&Flow)) {
             for maybe_flow in self.vec.iter() {
@@ -135,19 +151,22 @@ mod helper_struct {
     }
     impl GCL {
         pub fn new(hyper_p: usize, edge_count: usize) -> Self {
-            // FIXME 底下這行是寫來測試用的
-            return GCL { vec: vec![vec![(0, 30), (50, 70)]; edge_count], hyper_p };
-            //return GCL { vec: vec![vec![]; edge_count], hyper_p };
+            return GCL { vec: vec![vec![]; edge_count], hyper_p };
         }
         /// 回傳 `link_id` 上所有閘門關閉事件。
         /// * `回傳值` - 一個陣列，其內容為 (事件開始時間, 事件持續時間);
         pub fn get_close_event(&self, link_id: usize) -> &Vec<(usize, usize)> {
+            assert!(self.vec.len() > link_id, "GCL: 指定了超出範圍的邊");
             return &self.vec[link_id];
+        }
+        pub fn insert_close_event(&mut self, link_id: usize, start_time: usize, duration: usize) {
+            // FIXME: 應該做個二元搜索再插入
+            return self.vec[link_id].push((start_time, duration));
         }
     }
 }
 
-pub use helper_struct::{GCL, RouteTable};
+pub use helper_struct::{GCL, FlowTable};
 
 mod stream_aware_graph;
 pub use stream_aware_graph::StreamAwareGraph;
