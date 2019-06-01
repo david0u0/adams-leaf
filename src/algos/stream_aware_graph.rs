@@ -235,6 +235,12 @@ impl StreamAwareGraph {
             }
         }
     }
+    /// 把邊上記憶的資訊通通忘掉！
+    pub fn forget_all_flows(&mut self) {
+        for (_, tuple) in self.edge_info.iter_mut() {
+            tuple.1 = HashSet::new();
+        }
+    }
     /// 詢問一條路徑上所有共用過邊的資料流。針對路上每個邊都會回傳一個陣列，內含走了這個邊的資料流（空陣列代表無人走過）
     /// 
     /// __注意：方向不同者不視為共用！__
@@ -292,6 +298,10 @@ mod test {
 
         g.save_flowid_on_edge(false, 1, &vec![1, 0, 3, 4]);
         ans = vec![vec![], vec![0]];
+        assert_eq!(ans, g.get_overlap_flows(&vec![0, 3, 4]));
+
+        g.forget_all_flows();
+        ans = vec![vec![], vec![]];
         assert_eq!(ans, g.get_overlap_flows(&vec![0, 3, 4]));
 
         Ok(())

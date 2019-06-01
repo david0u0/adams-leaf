@@ -5,7 +5,7 @@ use super::{StreamAwareGraph, FlowTable, Flow, RoutingAlgo, GCL};
 use super::time_and_tide::compute_avb_latency;
 
 const K: usize = 20;
-const ALPHA: usize = K / 2;
+const ALPHA_PORTION: f64 = 0.5;
 const T_LIMIT: u128 = 1000 * 100; // micro_sec
 const C1_EXCEED: f64 = 1000.0;
 const W1: f64 = 1.0;
@@ -79,11 +79,16 @@ impl <'a> RO<'a> {
         while time.elapsed().as_micros() < T_LIMIT {
             iter_times += 1;
             // PHASE 1
+            unsafe {
+                // NOTE 從圖中把舊的資料流全部忘掉
+                (*_g).forget_all_flows();
+            }
             self.flow_table.foreach_flowtuple(true, |tuple| {
                 let mut min_cost = std::f64::MAX;
                 let mut best_r = 0;
                 let k = self.get_candidate_count(&tuple.0);
-                for r in gen_n_distinct_outof_k(k / 2, k).into_iter() {
+                let alpha = (k as f64 * ALPHA_PORTION) as usize;
+                for r in gen_n_distinct_outof_k(alpha, k).into_iter() {
                     tuple.2 = r;
                     let cost = self.compute_avb_cost(&tuple.0);
                     if cost < min_cost {
@@ -94,6 +99,7 @@ impl <'a> RO<'a> {
                 tuple.2 = best_r;
                 let route = self.get_kth_route(&tuple.0, best_r);
                 unsafe {
+                    // NOTE 把資料流的路徑與ID記憶到圖中
                     (*_g).save_flowid_on_edge(true, *tuple.0.id(), route);
                 }
             });
@@ -101,7 +107,7 @@ impl <'a> RO<'a> {
             min_cost = {
                 let cost = self.compute_all_avb_cost();
                 if min_cost > cost {
-                    println!("found min_cost = {}", cost);
+                    println!("found min_cost = {} at first glance!", cost);
                     cost
                 } else {
                     min_cost
@@ -114,15 +120,23 @@ impl <'a> RO<'a> {
     fn hill_climbing(&mut self, time: &std::time::Instant, mut min_cost: f64) -> f64 {
         let mut iter_times = 0;
         let mut best_table = self.flow_table.clone();
+        let _g = &self.g as *const StreamAwareGraph as *mut StreamAwareGraph;
         while time.elapsed().as_micros() < T_LIMIT {
             let target_id = rand::thread_rng().gen_range(0, self.avb_count);
             let target_flow = self.flow_table.get_flow(target_id);
-            let k = self.get_candidate_count(&target_flow);
-            let new_route = rand::thread_rng().gen_range(0, k);
-            if *self.flow_table.get_info(target_id) == new_route {
+            let r = self.get_candidate_count(&target_flow);
+            let new_route = rand::thread_rng().gen_range(0, r);
+            let old_route = *self.flow_table.get_info(target_id);
+            if old_route == new_route {
                 continue;
             } else {
-                // TODO 從圖中忘記舊路徑，記憶新路徑
+                // NOTE 從圖中忘記舊路徑，記憶新路徑
+                let old_route = self.get_kth_route(target_flow, old_route);
+                let new_route = self.get_kth_route(target_flow, new_route);
+                unsafe {
+                    (*_g).save_flowid_on_edge(false, target_id, old_route);
+                    (*_g).save_flowid_on_edge(true, target_id, new_route);
+                }
             }
             self.flow_table.update_info(target_id, 0.0, new_route);
             let cost = self.compute_all_avb_cost();
@@ -139,7 +153,6 @@ impl <'a> RO<'a> {
                 }
             }
         }
-        // TODO 從圖中把舊的資料流全部忘掉，依照 best_table 重新記憶
         self.flow_table = best_table.clone();
         min_cost
     }
