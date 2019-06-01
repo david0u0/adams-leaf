@@ -176,10 +176,10 @@ impl Graph<usize> for StreamAwareGraph {
             if let Some((bandwidth, _)) = self.nodes[cur].edges.get(&next) {
                 dist += 1.0 / bandwidth;
             } else {
-                return std::f64::MAX;
+                panic!("嘗試對一條走不通的路徑取距離");
             }
         }
-        return dist;
+        dist
     }
 }
 impl OnOffGraph<usize> for StreamAwareGraph {
@@ -235,6 +235,12 @@ impl StreamAwareGraph {
             }
         }
     }
+    /// 把邊上記憶的資訊通通忘掉！
+    pub fn forget_all_flows(&mut self) {
+        for (_, tuple) in self.edge_info.iter_mut() {
+            tuple.1 = HashSet::new();
+        }
+    }
     /// 詢問一條路徑上所有共用過邊的資料流。針對路上每個邊都會回傳一個陣列，內含走了這個邊的資料流（空陣列代表無人走過）
     /// 
     /// __注意：方向不同者不視為共用！__
@@ -242,8 +248,11 @@ impl StreamAwareGraph {
         // TODO 回傳的 Vec<Vec> 有優化空間
         let mut ret = Vec::with_capacity(route.len()-1);
         for i in 0..route.len()-1 {
-            let (_, set, _) = self.edge_info.get(&(route[i], route[i+1])).unwrap();
-            ret.push(set.iter().map(|id| *id).collect());
+            if let Some((_, set, _)) = self.edge_info.get(&(route[i], route[i+1])) {
+                ret.push(set.iter().map(|id| *id).collect());
+            } else {
+                panic!("{} {} 之間沒有連線", route[i], route[i + 1]);
+            }
         }
         ret
     }
@@ -289,6 +298,10 @@ mod test {
 
         g.save_flowid_on_edge(false, 1, &vec![1, 0, 3, 4]);
         ans = vec![vec![], vec![0]];
+        assert_eq!(ans, g.get_overlap_flows(&vec![0, 3, 4]));
+
+        g.forget_all_flows();
+        ans = vec![vec![], vec![]];
         assert_eq!(ans, g.get_overlap_flows(&vec![0, 3, 4]));
 
         Ok(())

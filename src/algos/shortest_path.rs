@@ -22,10 +22,10 @@ impl <'a> RoutingAlgo for SPF<'a> {
         for flow in flows.into_iter() {
             if let Flow::AVB { src, dst, .. } = flow {
                 let r = self.dijkstra_algo.get_route(src, dst);
-                self.flow_table.insert(flow, r.1);
+                self.flow_table.insert(flow, r.unwrap().1);
             } else if let Flow::TT { src, dst, .. } = flow {
                 let r = self.dijkstra_algo.get_route(src, dst);
-                self.flow_table.insert(flow, r.1);
+                self.flow_table.insert(flow, r.unwrap().1);
             }
         }
     }
