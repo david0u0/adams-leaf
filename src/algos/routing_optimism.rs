@@ -6,7 +6,7 @@ use super::time_and_tide::compute_avb_latency;
 
 const K: usize = 20;
 const ALPHA_PORTION: f64 = 0.5;
-const T_LIMIT: u128 = 1000 * 100; // micro_sec
+const T_LIMIT: u128 = 1000 * 10; // micro_sec
 const C1_EXCEED: f64 = 1000.0;
 const W1: f64 = 1.0;
 const W2: f64 = 1.0;
@@ -44,7 +44,7 @@ impl <'a> RO<'a> {
 }
 
 impl <'a> RO<'a> {
-    fn compute_avb_cost(&self, flow: &Flow) -> f64 {
+    pub fn compute_avb_cost(&self, flow: &Flow) -> f64 {
         let max_delay = *flow.max_delay();
         let route = self.get_kth_route(flow, *self.flow_table.get_info(*flow.id()));
         let latency = compute_avb_latency(
@@ -63,7 +63,7 @@ impl <'a> RO<'a> {
         let c3 = 0.0; // TODO 計算 c3
         W1*c1 + W2*c2 + W3*c3
     }
-    fn compute_all_avb_cost(&self) -> f64 {
+    pub fn compute_all_avb_cost(&self) -> f64 {
         let mut cost = 0.0;
         self.flow_table.foreach_flowtuple(true, |(flow, _, _)| {
             cost += self.compute_avb_cost(&flow);
@@ -72,10 +72,11 @@ impl <'a> RO<'a> {
     }
     /// 在所有 TT 都被排定的狀況下去執行 GRASP 優化
     fn grasp(&mut self) {
+        let _g = &mut self.g as *mut StreamAwareGraph;
         let time = std::time::Instant::now();
         let mut iter_times = 0;
         let mut min_cost = std::f64::MAX;
-        let _g = &self.g as *const StreamAwareGraph as *mut StreamAwareGraph;
+        let mut best_all_routing = FlowTable::<usize>::new();
         while time.elapsed().as_micros() < T_LIMIT {
             iter_times += 1;
             // PHASE 1
@@ -104,23 +105,22 @@ impl <'a> RO<'a> {
                 }
             });
             // PHASE 2
-            min_cost = {
-                let cost = self.compute_all_avb_cost();
-                if min_cost > cost {
-                    println!("found min_cost = {} at first glance!", cost);
-                    cost
-                } else {
-                    min_cost
-                }
-            };
-            min_cost = self.hill_climbing(&time, min_cost);
+            let cost = self.compute_all_avb_cost();
+            if cost < min_cost {
+                best_all_routing = self.flow_table.clone();
+                min_cost = cost;
+                println!("found min_cost = {} at first glance!", cost);
+            }
+            min_cost = self.hill_climbing(&time, min_cost, &mut best_all_routing);
         }
         println!("# of iteration = {}", iter_times);
+        self.flow_table = best_all_routing;
     }
-    fn hill_climbing(&mut self, time: &std::time::Instant, mut min_cost: f64) -> f64 {
+    fn hill_climbing(&mut self, time: &std::time::Instant,
+        mut min_cost: f64, best_all_routing: &mut FlowTable<usize>
+    ) -> f64 {
         let mut iter_times = 0;
-        let mut best_table = self.flow_table.clone();
-        let _g = &self.g as *const StreamAwareGraph as *mut StreamAwareGraph;
+        let _g = &mut self.g as *mut StreamAwareGraph;
         while time.elapsed().as_micros() < T_LIMIT {
             let target_id = rand::thread_rng().gen_range(0, self.avb_count);
             let target_flow = self.flow_table.get_flow(target_id);
@@ -141,10 +141,10 @@ impl <'a> RO<'a> {
             self.flow_table.update_info(target_id, 0.0, new_route);
             let cost = self.compute_all_avb_cost();
             if cost < min_cost {
-                iter_times = 0;
+                *best_all_routing = self.flow_table.clone();
                 min_cost = cost;
-                best_table = self.flow_table.clone();
-                println!("found min_cost = {}", min_cost);
+                iter_times = 0;
+                println!("found min_cost = {}", cost);
             } else {
                 iter_times += 1;
                 //println!("Nothing found QQ");
@@ -153,7 +153,6 @@ impl <'a> RO<'a> {
                 }
             }
         }
-        self.flow_table = best_table.clone();
         min_cost
     }
     fn get_kth_route(&self, flow: &Flow, k: usize) -> &Vec<usize> {
@@ -176,6 +175,12 @@ impl <'a> RoutingAlgo for RO<'a> {
             self.flow_table.insert(flow, 0);
         }
         self.grasp();
+        let g = &mut self.g as *mut StreamAwareGraph;
+        self.g.forget_all_flows();
+        self.flow_table.foreach_flowtuple(true, |(flow, _, k)| {
+            let r = self.get_kth_route(&flow, *k);
+            unsafe { (*g).save_flowid_on_edge(true, *flow.id(), r) }
+        });
     }
     fn get_retouted_flows(&self) -> &Vec<usize> {
         unimplemented!();

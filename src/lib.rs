@@ -1,6 +1,5 @@
 use std::fs;
 extern crate serde_json;
-use serde_json::Value;
 use serde::{Serialize, Deserialize};
 
 pub mod network_struct;
