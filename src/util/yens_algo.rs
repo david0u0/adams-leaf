@@ -155,24 +155,25 @@ mod test {
         }
 
         let mut algo = YensAlgo::new(&g, 10);
+        algo.compute_routes(0, 2);
         assert_eq!(&vec![0, 1, 2], algo.get_kth_route(0, 2, 0));
         assert_eq!(&vec![0, 1, 3, 2], algo.get_kth_route(0, 2, 1));
         assert_eq!(&vec![0, 1, 4, 2], algo.get_kth_route(0, 2, 2));
         assert_eq!(4, algo.get_route_count(0, 2));
 
-/*
-        assert_eq!(vec![0, 1, 4, 99], algo.get_routes(0, 99)[0].1);
-        assert_eq!(vec![0, 1, 4, 98, 99], algo.get_routes(0, 99)[1].1);
-        assert_eq!(vec![0, 1, 4, 97, 99], algo.get_routes(0, 99)[2].1);
-        assert_eq!(10, algo.get_routes(0, 99).len());
+        algo.compute_routes(0, 99);
+        assert_eq!(&vec![0, 1, 4, 99], algo.get_kth_route(0, 99, 0));
+        assert_eq!(&vec![0, 1, 4, 98, 99], algo.get_kth_route(0, 99, 1));
+        assert_eq!(&vec![0, 1, 4, 97, 99], algo.get_kth_route(0, 99, 2));
+        assert_eq!(10, algo.get_route_count(0, 99));
 
-        assert_eq!(vec![0, 1, 4, 99, 5], algo.get_routes(0, 5)[0].1);
-        assert_eq!(vec![0, 1, 4, 98, 5], algo.get_routes(0, 5)[1].1);
-        assert_eq!(vec![0, 1, 4, 97, 5], algo.get_routes(0, 5)[2].1);
-        assert_eq!(vec![0, 1, 4, 99, 98, 5], algo.get_routes(0, 5)[3].1);
-        assert_eq!(vec![0, 1, 4, 98, 99, 5], algo.get_routes(0, 5)[4].1);
-        assert_eq!(10, algo.get_routes(0, 5).len());
-*/
+        algo.compute_routes(0, 5);
+        assert_eq!(&vec![0, 1, 4, 99, 5], algo.get_kth_route(0, 5, 0));
+        assert_eq!(&vec![0, 1, 4, 98, 5], algo.get_kth_route(0, 5, 1));
+        assert_eq!(&vec![0, 1, 4, 97, 5], algo.get_kth_route(0, 5, 2));
+        assert_eq!(&vec![0, 1, 4, 99, 98, 5], algo.get_kth_route(0, 5, 3));
+        assert_eq!(&vec![0, 1, 4, 98, 99, 5], algo.get_kth_route(0, 5, 4));
+        assert_eq!(10, algo.get_route_count(0, 5));
         return Ok(());
     }
 }

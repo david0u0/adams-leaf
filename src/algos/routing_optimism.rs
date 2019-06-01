@@ -64,7 +64,7 @@ impl <'a> RO<'a> {
 impl <'a> RoutingAlgo for RO<'a> {
     fn compute_routes(&mut self, flows: Vec<Flow>) {
         for flow in flows.into_iter() {
-            let r = self.yens_algo.compute_routes(*flow.src(), *flow.dst());
+            self.yens_algo.compute_routes(*flow.src(), *flow.dst());
             let r = self.yens_algo.get_kth_route(*flow.src(), *flow.dst(), 0);
             self.g.save_flowid_on_edge(true, *flow.id(), r);
             self.flow_table.insert(flow, 0);
