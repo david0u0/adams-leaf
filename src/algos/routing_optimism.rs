@@ -17,6 +17,8 @@ pub struct RO<'a> {
     flow_table: FlowTable<usize>,
     yens_algo: YensAlgo<'a, usize, StreamAwareGraph>,
     gcl: GCL,
+    avb_count: usize,
+    tt_count: usize
 }
 
 fn gen_n_distinct_outof_k(n: usize, k: usize) -> Vec<usize> {
@@ -35,14 +37,16 @@ impl <'a> RO<'a> {
             g: g.clone(),
             flow_table: FlowTable::new(),
             yens_algo: YensAlgo::new(g, K),
+            avb_count: 0,
+            tt_count: 0
         };
     }
 }
 
 impl <'a> RO<'a> {
-    fn compute_avb_cost(&self, flow: &Flow, k: usize) -> f64 {
+    fn compute_avb_cost(&self, flow: &Flow) -> f64 {
         let max_delay = *flow.max_delay();
-        let route = self.get_kth_route(flow, k);
+        let route = self.get_kth_route(flow, *self.flow_table.get_info(*flow.id()));
         let latency = compute_avb_latency(
             &self.g,
             flow,
@@ -61,9 +65,8 @@ impl <'a> RO<'a> {
     }
     fn compute_all_avb_cost(&self) -> f64 {
         let mut cost = 0.0;
-        self.flow_table.foreach_flow(true, |flow| {
-            let k = *self.flow_table.get_info(*flow.id());
-            cost += self.compute_avb_cost(flow, k);
+        self.flow_table.foreach_flowtuple(true, |(flow, _, _)| {
+            cost += self.compute_avb_cost(&flow);
         });
         cost
     }
@@ -71,29 +74,74 @@ impl <'a> RO<'a> {
     fn grasp(&mut self) {
         let time = std::time::Instant::now();
         let mut iter_times = 0;
-        let mut_table = &mut self.flow_table as *mut FlowTable<usize>;
+        let mut min_cost = std::f64::MAX;
+        let _g = &self.g as *const StreamAwareGraph as *mut StreamAwareGraph;
         while time.elapsed().as_micros() < T_LIMIT {
             iter_times += 1;
             // PHASE 1
-            self.flow_table.foreach_flow(true, |flow| {
+            self.flow_table.foreach_flowtuple(true, |tuple| {
                 let mut min_cost = std::f64::MAX;
                 let mut best_r = 0;
-                let k = self.get_candidate_count(flow);
+                let k = self.get_candidate_count(&tuple.0);
                 for r in gen_n_distinct_outof_k(k / 2, k).into_iter() {
-                    let cost = self.compute_avb_cost(flow, r);
+                    tuple.2 = r;
+                    let cost = self.compute_avb_cost(&tuple.0);
                     if cost < min_cost {
                         min_cost = cost;
                         best_r = r;
                     }
                 }
+                tuple.2 = best_r;
+                let route = self.get_kth_route(&tuple.0, best_r);
                 unsafe {
-                    (*mut_table).update_info(*flow.id(), min_cost, best_r);
+                    (*_g).save_flowid_on_edge(true, *tuple.0.id(), route);
                 }
             });
             // PHASE 2
-
+            min_cost = {
+                let cost = self.compute_all_avb_cost();
+                if min_cost > cost {
+                    println!("found min_cost = {}", cost);
+                    cost
+                } else {
+                    min_cost
+                }
+            };
+            min_cost = self.hill_climbing(&time, min_cost);
         }
-        println!("{}", iter_times);
+        println!("# of iteration = {}", iter_times);
+    }
+    fn hill_climbing(&mut self, time: &std::time::Instant, mut min_cost: f64) -> f64 {
+        let mut iter_times = 0;
+        let mut best_table = self.flow_table.clone();
+        while time.elapsed().as_micros() < T_LIMIT {
+            let target_id = rand::thread_rng().gen_range(0, self.avb_count);
+            let target_flow = self.flow_table.get_flow(target_id);
+            let k = self.get_candidate_count(&target_flow);
+            let new_route = rand::thread_rng().gen_range(0, k);
+            if *self.flow_table.get_info(target_id) == new_route {
+                continue;
+            } else {
+                // TODO 從圖中忘記舊路徑，記憶新路徑
+            }
+            self.flow_table.update_info(target_id, 0.0, new_route);
+            let cost = self.compute_all_avb_cost();
+            if cost < min_cost {
+                iter_times = 0;
+                min_cost = cost;
+                best_table = self.flow_table.clone();
+                println!("found min_cost = {}", min_cost);
+            } else {
+                iter_times += 1;
+                //println!("Nothing found QQ");
+                if iter_times == self.avb_count {
+                    break;
+                }
+            }
+        }
+        // TODO 從圖中把舊的資料流全部忘掉，依照 best_table 重新記憶
+        self.flow_table = best_table.clone();
+        min_cost
     }
     fn get_kth_route(&self, flow: &Flow, k: usize) -> &Vec<usize> {
         self.yens_algo.get_kth_route(*flow.src(), *flow.dst(), k)
@@ -107,8 +155,11 @@ impl <'a> RoutingAlgo for RO<'a> {
     fn compute_routes(&mut self, flows: Vec<Flow>) {
         for flow in flows.into_iter() {
             self.yens_algo.compute_routes(*flow.src(), *flow.dst());
-            let r = self.yens_algo.get_kth_route(*flow.src(), *flow.dst(), 0);
-            self.g.save_flowid_on_edge(true, *flow.id(), r);
+            if let Flow::AVB { .. } = &flow {
+                self.avb_count += 1;
+            } else {
+                self.tt_count += 1;
+            }
             self.flow_table.insert(flow, 0);
         }
         self.grasp();

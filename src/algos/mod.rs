@@ -136,15 +136,22 @@ mod helper_struct {
                 panic!("更新路徑時發現資料流不存在");
             }
         }
-        pub fn foreach_flow(&self, is_avb: bool, mut callback: impl FnMut(&Flow)) {
+        pub fn foreach_flowtuple(&self, is_avb: bool,
+            mut callback: impl FnMut(&mut (Flow, f64, T))
+        ) {
             for maybe_flow in self.vec.iter() {
-                if let Some((flow, _, _)) = maybe_flow {
-                    if let Flow::AVB { .. } = flow {
+                if let Some(tuple) = maybe_flow {
+                    let _tuple = tuple as *const (Flow, f64, T) as *mut (Flow, f64, T);
+                    if let Flow::AVB { .. } = tuple.0 {
                         if is_avb {
-                            callback(flow);
+                            unsafe {
+                                callback(&mut *_tuple);
+                            }
                         }
                     } else if !is_avb {
-                        callback(flow);
+                        unsafe {
+                            callback(&mut *_tuple);
+                        }
                     }
                 } else {
                     break;
