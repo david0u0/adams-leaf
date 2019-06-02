@@ -65,8 +65,8 @@ impl <'a> RO<'a> {
     }
     pub fn compute_all_avb_cost(&self) -> f64 {
         let mut cost = 0.0;
-        self.flow_table.foreach_flowtuple(true, |(flow, _, _)| {
-            cost += self.compute_avb_cost(&flow);
+        self.flow_table.foreach(true, |flow, _| {
+            cost += self.compute_avb_cost(flow);
         });
         cost
     }
@@ -84,24 +84,24 @@ impl <'a> RO<'a> {
                 // NOTE 從圖中把舊的資料流全部忘掉
                 (*_g).forget_all_flows();
             }
-            self.flow_table.foreach_flowtuple(true, |tuple| {
+            self.flow_table.foreach_mut(true, |flow, route| {
                 let mut min_cost = std::f64::MAX;
                 let mut best_r = 0;
-                let k = self.get_candidate_count(&tuple.0);
+                let k = self.get_candidate_count(flow);
                 let alpha = (k as f64 * ALPHA_PORTION) as usize;
                 for r in gen_n_distinct_outof_k(alpha, k).into_iter() {
-                    tuple.2 = r;
-                    let cost = self.compute_avb_cost(&tuple.0);
+                    *route = r;
+                    let cost = self.compute_avb_cost(flow);
                     if cost < min_cost {
                         min_cost = cost;
                         best_r = r;
                     }
                 }
-                tuple.2 = best_r;
-                let route = self.get_kth_route(&tuple.0, best_r);
+                *route = best_r;
+                let route = self.get_kth_route(flow, best_r);
                 unsafe {
                     // NOTE 把資料流的路徑與ID記憶到圖中
-                    (*_g).save_flowid_on_edge(true, *tuple.0.id(), route);
+                    (*_g).save_flowid_on_edge(true, *flow.id(), route);
                 }
             });
             // PHASE 2
@@ -138,7 +138,7 @@ impl <'a> RO<'a> {
                     (*_g).save_flowid_on_edge(true, target_id, new_route);
                 }
             }
-            self.flow_table.update_info(target_id, 0.0, new_route);
+            self.flow_table.update_info(target_id, new_route);
             let cost = self.compute_all_avb_cost();
             if cost < min_cost {
                 *best_all_routing = self.flow_table.clone();
@@ -165,19 +165,19 @@ impl <'a> RO<'a> {
 
 impl <'a> RoutingAlgo for RO<'a> {
     fn compute_routes(&mut self, flows: Vec<Flow>) {
-        for flow in flows.into_iter() {
+        for flow in flows.iter() {
             self.yens_algo.compute_routes(*flow.src(), *flow.dst());
             if let Flow::AVB { .. } = &flow {
                 self.avb_count += 1;
             } else {
                 self.tt_count += 1;
             }
-            self.flow_table.insert(flow, 0);
         }
+        self.flow_table.insert(flows, 0);
         self.grasp();
         let g = &mut self.g as *mut StreamAwareGraph;
         self.g.forget_all_flows();
-        self.flow_table.foreach_flowtuple(true, |(flow, _, k)| {
+        self.flow_table.foreach(true, |flow, k| {
             let r = self.get_kth_route(&flow, *k);
             unsafe { (*g).save_flowid_on_edge(true, *flow.id(), r) }
         });
