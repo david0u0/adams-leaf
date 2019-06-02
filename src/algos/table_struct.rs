@@ -1,11 +1,11 @@
 use std::rc::Rc;
 use super::{Flow};
-pub const MAX_FLOW_ID: usize = 9999;
 /// 儲存的資料分為兩部份：資料流本身，以及隨附的資訊（T）。
 /// 
 /// __注意！這個資料結構 clone 的時候並不會把所有資料流複製一次，只會複製資訊的部份。__
 /// 
 /// 此處隱含的假設為：資料流本身不會時常變化，在演算法執行的過程中應該是唯一不變的，因此用一個 Rc 來記憶即可。
+/// 
 /// TODO 觀察在大資料量下這個改動是否有優化的效果。在小資料量下似乎沒啥差別。
 #[derive(Clone)]
 pub struct FlowTable<T: Clone> {
@@ -15,8 +15,8 @@ pub struct FlowTable<T: Clone> {
 impl <T: Clone> FlowTable<T> {
     pub fn new() -> Self {
         return FlowTable {
-            infos: vec![None; MAX_FLOW_ID],
-            flow_list: Rc::new(vec![None; MAX_FLOW_ID])
+            infos: vec![],
+            flow_list: Rc::new(vec![])
         };
     }
     pub fn get_flow(&self, id: usize) -> &Flow {
@@ -45,6 +45,12 @@ impl <T: Clone> FlowTable<T> {
         if let Ok(mut list) = Rc::try_unwrap(list) {
             for flow in flows.into_iter() {
                 let id = *flow.id();
+                if id >= list.len() {
+                    for _ in 0..(list.len() - id + 1) {
+                        list.push(None);
+                        self.infos.push(None);
+                    }
+                }
                 list[id] = Some(flow);
                 self.infos[id] = Some(info.clone());
             }
@@ -84,9 +90,6 @@ impl <T: Clone> FlowTable<T> {
                         callback(flow, &mut *_info);
                     }
                 }
-            } else {
-                break;
-                // FIXME 應記錄總共有多少資料流，而不是直接跳掉
             }
         }
     }
@@ -116,13 +119,19 @@ impl GCL {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::read_flows_from_file;
     #[test]
     #[should_panic]
-    fn flowtable_datarace_should_panic() {
+    fn datarace_should_panic() {
         let mut table = FlowTable::<usize>::new();
-        let _flow_list = table.flow_list.clone();
-        let flows = read_flows_from_file(0, "flows.json");
-        table.insert(flows, 0);
+        let _table2 = table.clone();
+        // drop(_table2);
+        table.insert(vec![], 0);
+    }
+    #[test]
+    fn no_datarace_no_panic() {
+        let mut table = FlowTable::<usize>::new();
+        let _table2 = table.clone();
+        drop(_table2);
+        table.insert(vec![], 0);
     }
 }

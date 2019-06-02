@@ -94,6 +94,9 @@ pub use aco::ACO;
 mod table_struct;
 pub use table_struct::{FlowTable, GCL};
 
+mod cost_calculator;
+pub use cost_calculator::CostCalculator;
+
 pub mod time_and_tide;
 
 #[cfg(test)]

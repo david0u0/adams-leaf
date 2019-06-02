@@ -12,15 +12,6 @@ const W1: f64 = 1.0;
 const W2: f64 = 1.0;
 const W3: f64 = 1.0;
 
-pub struct RO<'a> {
-    g: StreamAwareGraph,
-    flow_table: FlowTable<usize>,
-    yens_algo: YensAlgo<'a, usize, StreamAwareGraph>,
-    gcl: GCL,
-    avb_count: usize,
-    tt_count: usize
-}
-
 fn gen_n_distinct_outof_k(n: usize, k: usize) -> Vec<usize> {
     let mut vec = Vec::with_capacity(n);
     for i in 0..k {
@@ -30,20 +21,26 @@ fn gen_n_distinct_outof_k(n: usize, k: usize) -> Vec<usize> {
     vec.into_iter().map(|(_, i)| i).take(n).collect()
 }
 
+pub struct RO<'a> {
+    g: StreamAwareGraph,
+    flow_table: FlowTable<usize>,
+    yens_algo: YensAlgo<'a, usize, StreamAwareGraph>,
+    gcl: GCL,
+    avb_count: usize,
+    tt_count: usize,
+}
+
 impl <'a> RO<'a> {
     pub fn new(g: &'a StreamAwareGraph, hyper_p: usize, gcl: GCL) -> Self {
-        return RO {
+        RO {
             gcl,
             g: g.clone(),
             flow_table: FlowTable::new(),
             yens_algo: YensAlgo::new(g, K),
             avb_count: 0,
-            tt_count: 0
-        };
+            tt_count: 0,
+        }
     }
-}
-
-impl <'a> RO<'a> {
     pub fn compute_avb_cost(&self, flow: &Flow) -> f64 {
         let max_delay = *flow.max_delay();
         let route = self.get_kth_route(flow, *self.flow_table.get_info(*flow.id()));
@@ -162,7 +159,6 @@ impl <'a> RO<'a> {
         self.yens_algo.get_route_count(*flow.src(), *flow.dst())
     }
 }
-
 impl <'a> RoutingAlgo for RO<'a> {
     fn compute_routes(&mut self, flows: Vec<Flow>) {
         for flow in flows.iter() {
