@@ -10,8 +10,8 @@ const MAX_BE_SIZE: f64 = 1522.0;
 /// * `flow` - 該 AVB 資料流的詳細資訊
 /// * `route` - 該 AVB 資料流的路徑
 /// * `gcl` - 所有 TT 資料流的 Gate Control List
-pub fn compute_avb_latency(g: &StreamAwareGraph, flow: &Flow,
-    route: &Vec<usize>, flow_table: &FlowTable<usize>, gcl: &GCL
+pub fn compute_avb_latency<T: Clone>(g: &StreamAwareGraph, flow: &Flow,
+    route: &Vec<usize>, flow_table: &FlowTable<T>, gcl: &GCL
 ) -> f64 {
     if let Flow::AVB { id, size, avb_type, .. } = flow {
         let overlap_flow_id = g.get_overlap_flows(route);
@@ -27,8 +27,9 @@ pub fn compute_avb_latency(g: &StreamAwareGraph, flow: &Flow,
         panic!("並非 AVB 資料流！");
     }
 }
-fn wcd_on_single_link(id: usize, size: u32, self_type: AVBType, bandwidth: f64,
-    flow_table: &FlowTable<usize>, overlap_flow_id: &Vec<usize>
+fn wcd_on_single_link<T: Clone>(id: usize, size: u32,
+    self_type: AVBType, bandwidth: f64,
+    flow_table: &FlowTable<T>, overlap_flow_id: &Vec<usize>
 ) -> f64 {
     let mut wcd = 0.0;
     // MAX None AVB
@@ -107,9 +108,7 @@ mod test {
         let type_a = AVBType::new_type_a();
         let type_b = AVBType::new_type_b();
 
-        route_table.insert(flows[0].clone(), 0);
-        route_table.insert(flows[2].clone(), 0);
-        route_table.insert(flows[1].clone(), 0);
+        route_table.insert(flows, 0);
 
         assert_eq!(wcd_on_single_link(0, 75, type_a, 100.0, &route_table, &vec![0, 2]),
             (MAX_BE_SIZE/100.0 + 1.0));
@@ -124,12 +123,12 @@ mod test {
     #[test]
     fn test_endtoend_avb_without_gcl() {
         let (mut g, flows, mut flow_table, gcl) = init_settings();
-        flow_table.insert(flows[0].clone(), 0);
+        flow_table.insert(vec![flows[0].clone()], 0);
         g.save_flowid_on_edge(true, 0, &vec![0, 1, 2]);
         assert_eq!(compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
             (MAX_BE_SIZE/100.0 + 1.0) * 2.0);
 
-        flow_table.insert(flows[1].clone(), 0);
+        flow_table.insert(vec![flows[1].clone()], 0);
         g.save_flowid_on_edge(true, 1, &vec![0, 1, 2]);
         assert_eq!(compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
             (MAX_BE_SIZE/100.0 + 1.0 + 2.0) * 2.0);
@@ -138,9 +137,9 @@ mod test {
     fn test_endtoend_avb_with_gcl() { // 其實已經接近整合測試了 @@
         let (mut g, flows, mut flow_table, mut gcl) = init_settings();
 
-        flow_table.insert(flows[0].clone(), 0);
+        flow_table.insert(vec![flows[0].clone()], 0);
         g.save_flowid_on_edge(true, 0, &vec![0, 1, 2]);
-        flow_table.insert(flows[1].clone(), 0);
+        flow_table.insert(vec![flows[1].clone()], 0);
         g.save_flowid_on_edge(true, 1, &vec![0, 1, 2]);
 
         gcl.insert_close_event(0, 0, 10);

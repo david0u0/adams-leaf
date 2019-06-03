@@ -114,14 +114,16 @@ impl Graph<usize> for StreamAwareGraph {
     fn get_node_cnt(&self) -> usize {
         return self.node_cnt;
     }
-    fn add_edge(&mut self, id_pair: (usize, usize), bandwidth: f64) -> Result<usize, String> {
+    fn add_edge(&mut self,
+        id_pair: (usize, usize), bandwidth: f64)
+    -> Result<(usize, usize), String> {
         if self._check_exist(id_pair.0) && self._check_exist(id_pair.1) {
             let edge_id = self.cur_edge_id;
             self._add_single_edge(edge_id, id_pair, bandwidth);
             self._add_single_edge(edge_id+1, (id_pair.1, id_pair.0), bandwidth);
             self.edge_cnt += 2;
             self.cur_edge_id += 2;
-            return Ok(edge_id);
+            return Ok((edge_id, edge_id+1));
         } else {
             return Err("加入邊時發現節點不存在".to_owned());
         }
