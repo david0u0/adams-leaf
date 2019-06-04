@@ -27,7 +27,7 @@ pub fn compute_avb_latency<T: Clone>(g: &StreamAwareGraph, flow: &Flow,
         panic!("並非 AVB 資料流！");
     }
 }
-fn wcd_on_single_link<T: Clone>(id: usize, size: u32,
+fn wcd_on_single_link<T: Clone>(id: usize, size: usize,
     self_type: AVBType, bandwidth: f64,
     flow_table: &FlowTable<T>, overlap_flow_id: &Vec<usize>
 ) -> f64 {

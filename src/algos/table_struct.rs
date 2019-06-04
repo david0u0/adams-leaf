@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::rc::Rc;
 use super::{Flow};
 /// 儲存的資料分為兩部份：資料流本身，以及隨附的資訊（T）。
@@ -134,16 +135,41 @@ impl <T: Clone> FlowTable<T> {
             }
         }
     }
+    pub fn union(&self, is_avb: bool, other: &FlowTable<T>) -> Self {
+        if !self.is_same_flow_list(other) {
+            panic!("試圖");
+        }
+        let mut new = self.clone();
+        other.foreach(is_avb, |flow, info| {
+            let id = *flow.id();
+            new.update_info(id, info.clone());
+        });
+        new
+    }
+    pub fn is_same_flow_list(&self, other: &FlowTable<T>) -> bool {
+        let a = &*self.flow_list as *const Vec<Option<Flow>>;
+        let b = &*other.flow_list as *const Vec<Option<Flow>>;
+        a == b
+    }
 }
 
 pub struct GCL {
     hyper_p: usize,
     // TODO 這個資料結構有優化的空間
     vec: Vec<Vec<(usize, usize)>>,
+    queue_map: HashMap<(usize, usize), u8>
 }
 impl GCL {
     pub fn new(hyper_p: usize, edge_count: usize) -> Self {
-        return GCL { vec: vec![vec![]; edge_count], hyper_p };
+        GCL {
+            vec: vec![vec![]; edge_count],
+            queue_map: HashMap::new(),
+            hyper_p
+        }
+    }
+    pub fn clear(&mut self) {
+        self.queue_map = HashMap::new();
+        self.vec.clear();
     }
     /// 回傳 `link_id` 上所有閘門關閉事件。
     /// * `回傳值` - 一個陣列，其內容為 (事件開始時間, 事件持續時間);
@@ -154,6 +180,12 @@ impl GCL {
     pub fn insert_close_event(&mut self, link_id: usize, start_time: usize, duration: usize) {
         // FIXME: 應該做個二元搜索再插入
         return self.vec[link_id].push((start_time, duration));
+    }
+    pub fn get_queueid(&self, edge_id: usize, flow_id: usize) -> u8 {
+        *self.queue_map.get(&(edge_id, flow_id)).unwrap()
+    }
+    pub fn set_queueid(&mut self, queueid: u8, edge_id: usize, flow_id: usize) {
+        self.queue_map.insert((edge_id, flow_id), queueid);
     }
 }
 
@@ -193,6 +225,23 @@ mod test {
         assert_eq!(count_flows_inside(&changed), 2);
 
         assert_eq!(*changed.get_info(2), 99);
+        assert_eq!(*changed.get_info(4), 77);
+        assert_eq!(*table.get_info(2), 0);
+
+        let merged = table.union(true, &changed);
+        assert_eq!(*merged.get_info(2), 99);
+        assert_eq!(*merged.get_info(4), 77);
+        assert_eq!(count_flows_inside(&merged), 5);
+    }
+    #[test]
+    #[should_panic]
+    fn union_different_flows_should_panic() {
+        let mut table = FlowTable::<usize>::new();
+        let flows = read_flows_from_file(0, "flows.json");
+        table.insert(flows.clone(), 0);
+        let mut table2 = FlowTable::<usize>::new();
+        table2.insert(flows.clone(), 0);
+        table.union(true, &table2);
     }
     fn count_flows_inside(table: &FlowTable<usize>) -> usize {
         let mut cnt = 0;

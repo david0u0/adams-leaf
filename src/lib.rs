@@ -54,7 +54,7 @@ struct AllFlows {
 }
 #[derive(Serialize, Deserialize)]
 struct TTFlow {
-    size: u32,
+    size: usize,
     src: usize,
     dst: usize,
     period: u32,
@@ -63,7 +63,7 @@ struct TTFlow {
 }
 #[derive(Serialize, Deserialize)]
 struct AVBFlow {
-    size: u32,
+    size: usize,
     src: usize,
     dst: usize,
     period: u32,

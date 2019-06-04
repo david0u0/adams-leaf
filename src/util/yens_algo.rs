@@ -51,6 +51,9 @@ impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
             panic!("先運行 compute_routes");
         }
     }
+    pub fn get_graph(&self) -> &G {
+        &self.g
+    }
     pub fn compute_routes(&mut self, src: K, dst: K) {
         if self.route_table.contains_key(&(src, dst)) {
             return;

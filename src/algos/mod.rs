@@ -59,7 +59,7 @@ impl AVBType {
 build_shared_enum! { 
     Flow {
         id: usize,
-        size: u32,
+        size: usize,
         src: usize,
         dst: usize,
         period: u32,
