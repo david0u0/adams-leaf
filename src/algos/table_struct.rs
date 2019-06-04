@@ -9,15 +9,37 @@ use super::{Flow};
 /// TODO 觀察在大資料量下這個改動是否有優化的效果。在小資料量下似乎沒啥差別。
 #[derive(Clone)]
 pub struct FlowTable<T: Clone> {
+    changed: Option<Vec<usize>>,
     flow_list: Rc<Vec<Option<Flow>>>,
     infos: Vec<Option<T>>
 }
 impl <T: Clone> FlowTable<T> {
     pub fn new() -> Self {
-        return FlowTable {
+        FlowTable {
+            changed: None,
             infos: vec![],
             flow_list: Rc::new(vec![])
-        };
+        }
+    }
+    /// 建立一個新的資料流表。邏輯上，這個新資料流表為空，但可以執行 update_info。
+    /// # 範例
+    /// ```
+    /// let mut table = FlowTable::<usize>::new();
+    /// table.insert(vec![flow0, flow1], 0);
+    /// // table 中有兩個資料流，隨附資訊皆為0
+    /// let mut changed_table = table;
+    /// // changed_table 中有零個資料流
+    /// changed_table.update(1, 99);
+    /// // changed_table 中有一個 id=1 的資料流，且隨附資訊為99
+    /// changed_table.insert(vec![flow2], 0);
+    /// // will panic!
+    /// ```
+    pub fn clone_into_changed_table(&self) -> Self {
+        FlowTable {
+            changed: Some(vec![]),
+            infos: vec![None; self.infos.len()],
+            flow_list: self.flow_list.clone()
+        }
     }
     pub fn get_flow(&self, id: usize) -> &Flow {
         if let Some(t) = &self.flow_list[id] {
@@ -32,11 +54,11 @@ impl <T: Clone> FlowTable<T> {
         panic!("該資料流不存在");
     }
     pub fn delete_flow(&mut self, id: usize) {
-        if let Some(_) = &self.infos[id] {
+        /* if let Some(_) = &self.infos[id] {
             //self.flow_list[id] = None;
         } else {
             panic!("該資料流不存在");
-        }
+        } */
         unimplemented!();
     }
     pub fn insert(&mut self, flows: Vec<Flow>, info: T) {
@@ -63,7 +85,10 @@ impl <T: Clone> FlowTable<T> {
         if let Some(entry) = &mut self.infos[id] {
             *entry = info;
         } else {
-            panic!("更新路徑時發現資料流不存在");
+            self.infos[id] = Some(info);
+        }
+        if let Some(changed) = &mut self.changed {
+            changed.push(id);
         }
     }
     pub fn foreach(&self, is_avb: bool,
@@ -77,18 +102,34 @@ impl <T: Clone> FlowTable<T> {
     pub fn foreach_mut(&self, is_avb: bool,
         mut callback: impl FnMut(&Flow, &mut T)
     ) {
-        for (i, info) in self.infos.iter().enumerate() {
-            if let Some(info) = &info {
-                let flow = self.flow_list[i].as_ref().unwrap();
-                let _info = info as *const T as *mut T;
-                unsafe {
-                    if let Flow::AVB { .. } = flow {
-                        if is_avb {
-                            callback(flow, &mut *_info);
-                        }
-                    } else if !is_avb {
+        if let Some(changed) = &self.changed {
+            for &i in changed.iter() {
+                self.apply_callback(is_avb, i, |flow, t| {
+                    callback(flow, t);
+                });
+            }
+        } else {
+            for i in 0..self.infos.len() {
+                self.apply_callback(is_avb, i, |flow, t| {
+                    callback(flow, t);
+                });
+            }
+        }
+    }
+    #[inline(always)]
+    fn apply_callback(&self, is_avb: bool, index: usize,
+        mut callback: impl FnMut(&Flow, &mut T)
+    ) {
+        if let Some(info) = &self.infos[index] {
+            let flow = self.flow_list[index].as_ref().unwrap();
+            let _info = info as *const T as *mut T;
+            unsafe {
+                if let Flow::AVB { .. } = flow {
+                    if is_avb {
                         callback(flow, &mut *_info);
                     }
+                } else if !is_avb {
+                    callback(flow, &mut *_info);
                 }
             }
         }
@@ -118,6 +159,7 @@ impl GCL {
 
 #[cfg(test)]
 mod test {
+    use crate::read_flows_from_file;
     use super::*;
     #[test]
     #[should_panic]
@@ -133,5 +175,33 @@ mod test {
         let _table2 = table.clone();
         drop(_table2);
         table.insert(vec![], 0);
+    }
+    #[test]
+    fn test_changed_flow_table() {
+        let mut table = FlowTable::<usize>::new();
+        let flows = read_flows_from_file(0, "flows.json");
+        table.insert(flows, 0);
+        assert_eq!(count_flows_inside(&table), 5);
+
+        let mut changed = table.clone_into_changed_table();
+        assert_eq!(count_flows_inside(&changed), 0);
+
+        changed.update_info(2, 99);
+        assert_eq!(count_flows_inside(&changed), 1);
+
+        changed.update_info(4, 77);
+        assert_eq!(count_flows_inside(&changed), 2);
+
+        assert_eq!(*changed.get_info(2), 99);
+    }
+    fn count_flows_inside(table: &FlowTable<usize>) -> usize {
+        let mut cnt = 0;
+        table.foreach(true, |_, _| {
+            cnt += 1;
+        });
+        table.foreach(false, |_, _| {
+            cnt += 1;
+        });
+        cnt
     }
 }
