@@ -7,7 +7,7 @@ type Yens<'a> = YensAlgo<'a, usize, StreamAwareGraph>;
 const MTU: usize = 1000;
 const PROCESS_TIME: f64 = 10.0;
 
-/// 一個大小為 size 的資料流要切成幾個訊框才夠？
+/// 一個大小為 size 的資料流要切成幾個封包才夠？
 #[inline(always)]
 fn get_frame_cnt(size: usize) -> u8 {
     if size % MTU == 0 {
@@ -22,6 +22,7 @@ fn get_route<'a> (flow: &'a Flow, table: &'a FT, yens: &'a Yens) -> &'a Vec<usiz
     yens.get_kth_route(*flow.src(), *flow.dst(), k)
 }
 
+use std::cmp::Ordering;
 /// 排序的標準：
 /// * `deadline` - 時間較緊的要排前面
 /// * `period` - 週期短的要排前面
@@ -50,31 +51,27 @@ fn cmp_flow(id1: usize, id2: usize, table: &FT, yens: &Yens) -> Ordering {
     }
 }
 
-pub fn tt_scheduling_offline(flow_table: &FT, gcl: &mut GCL, yens: &Yens) {
-    // TODO 離線跟線上應該是兩套算法
-    let og_table = FlowTable::new();
-    tt_scheduling_online(&og_table, flow_table, gcl, yens);
-}
-
 /// 動態計算 TT 資料流的 Gate Control List
 /// * `og_table` - 本來的資料流表
 /// * `changed_table` - 被改動到的那部份資料流，包含新增與換路徑
 /// * `gcl` - 本來的 Gate Control List
 /// * `yens` - Yen's algorithm 的物件，因為真正的路徑資訊記錄在這裡面
-pub fn tt_scheduling_online(og_table: &FT, changed_table: &FT, gcl: &mut GCL, yens: &Yens) {
-    let result = tt_scheduling_fixed_og(changed_table, gcl, yens);
+pub fn schedule_online(og_table: &FT,
+    changed_table: &FT, gcl: &mut GCL, yens: &Yens
+) -> Result<(), ()> {
+    let result = schedule_fixed_og(changed_table, gcl, yens);
     if !result.is_ok() {
         gcl.clear();
         let union_table = og_table.union(true, changed_table);
-        let result = tt_scheduling_fixed_og(&union_table, gcl, yens);
-        if !result.is_ok() {
-            panic!("GCL 怎麼排都排不下 GG");
-        }
+        schedule_fixed_og(&union_table, gcl, yens)?;
     }
+    Ok(())
 }
 
-use std::cmp::Ordering;
-fn tt_scheduling_fixed_og(changed_table: &FT, gcl: &mut GCL, yens: &Yens) -> Result<(), ()> {
+/// 也可以當作離線排程算法來使用
+pub fn schedule_fixed_og(changed_table: &FT,
+    gcl: &mut GCL, yens: &Yens
+) -> Result<(), ()> {
     let mut tt_flows = Vec::<usize>::new();
     let g = yens.get_graph();
     changed_table.foreach(false, |flow, _| {
@@ -171,6 +168,7 @@ fn calculate_offsets(flow: &Flow, all_offsets: &Vec<Vec<f64>>,
                     }
                 }
                 // NOTE 檢查 arrive_time ~ cur_offset+trans_time 這段時間中有沒有發生同個佇列被佔用的事件
+                // FIXME 應該提到最外面，用最後的 cur_offset 對 hyper period 中所有狀況做一次總檢查才對
                 let can_occupy = gcl.check_can_occupy(
                     links[i+1].0,
                     ro[i],
@@ -188,7 +186,6 @@ fn calculate_offsets(flow: &Flow, all_offsets: &Vec<Vec<f64>>,
                 break;
             }
         }
-
         offsets.push(cur_offset);
     }
     Ok(offsets)
