@@ -154,13 +154,13 @@ impl <T: Clone> FlowTable<T> {
 }
 
 pub struct GCL {
-    hyper_p: usize,
+    hyper_p: u32,
     // TODO 這個資料結構有優化的空間
     vec: Vec<Vec<(usize, usize)>>,
-    queue_map: HashMap<(usize, usize), u8>
+    queue_map: HashMap<(usize, usize), u8>,
 }
 impl GCL {
-    pub fn new(hyper_p: usize, edge_count: usize) -> Self {
+    pub fn new(hyper_p: u32, edge_count: usize) -> Self {
         GCL {
             vec: vec![vec![]; edge_count],
             queue_map: HashMap::new(),
@@ -171,6 +171,9 @@ impl GCL {
         self.queue_map = HashMap::new();
         self.vec.clear();
     }
+    pub fn get_hyper_p(&self) -> u32 {
+        self.hyper_p
+    }
     /// 回傳 `link_id` 上所有閘門關閉事件。
     /// * `回傳值` - 一個陣列，其內容為 (事件開始時間, 事件持續時間);
     pub fn get_close_event(&self, link_id: usize) -> &Vec<(usize, usize)> {
@@ -180,6 +183,23 @@ impl GCL {
     pub fn insert_close_event(&mut self, link_id: usize, start_time: usize, duration: usize) {
         // FIXME: 應該做個二元搜索再插入
         return self.vec[link_id].push((start_time, duration));
+    }
+    /// 檢查從 start 至 (start+duration) 這段時間裡有沒有發生事件
+    pub fn check_overlap(&self, link_id: usize, start: usize, duration: usize) -> bool {
+        let p1 = self.get_nearest_point_before(link_id, start);
+        let p2 = self.get_nearest_point_before(link_id, start+duration);
+        if p1.0 != p2.0 {
+            false
+        } else if p1.1 { // 是同一個閘門事件的開始
+            false
+        } else {
+            true
+        }
+    }
+    /// 回傳一組資料(usize, bool)，前者代表時間，後者代表該時間是閘門事件的開始還是結束（真代表開始）
+    fn get_nearest_point_before(&self, link_id: usize, time: usize) -> (usize, bool) {
+        // TODO 應該用二元搜索來優化?
+        unimplemented!();
     }
     pub fn get_queueid(&self, edge_id: usize, flow_id: usize) -> u8 {
         *self.queue_map.get(&(edge_id, flow_id)).unwrap()

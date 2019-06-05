@@ -63,7 +63,7 @@ build_shared_enum! {
         src: usize,
         dst: usize,
         period: u32,
-        max_delay: f64
+        max_delay: u32
     },
     AVB {
         avb_type: AVBType

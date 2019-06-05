@@ -58,8 +58,8 @@ struct TTFlow {
     src: usize,
     dst: usize,
     period: u32,
-    max_delay: f64,
-    offset: u32
+    max_delay: u32,
+    offset: u32,
 }
 #[derive(Serialize, Deserialize)]
 struct AVBFlow {
@@ -67,6 +67,6 @@ struct AVBFlow {
     src: usize,
     dst: usize,
     period: u32,
-    max_delay: f64,
+    max_delay: u32,
     avb_type: char
 }
