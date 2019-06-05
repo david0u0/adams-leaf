@@ -120,19 +120,12 @@ fn calculate_offsets(flow: &Flow, all_offsets: &Vec<Vec<f64>>,
 ) -> Result<Vec<f64>, ()> {
     let mut offsets = Vec::<f64>::with_capacity(links.len());
     let hyper_p = gcl.get_hyper_p();
-    let flow_offset = {
-        if let Flow::TT { offset, .. } = flow {
-            *offset as f64
-        } else {
-            panic!("並非TT資料流！");
-        }
-    };
     for i in 0..links.len() {
         let trans_time = MTU as f64 / links[i].1;
-        let mut cur_offset = {
+        let arrive_time = {
             if i == 0 {
                 if all_offsets.len() == 0 {
-                    flow_offset
+                    flow.offset() as f64
                 } else {
                     // #m-1 封包完整送出
                     all_offsets[all_offsets.len()-1][i] + trans_time
@@ -142,6 +135,7 @@ fn calculate_offsets(flow: &Flow, all_offsets: &Vec<Vec<f64>>,
                 offsets[i-1] + MTU as f64 / links[i-1].1 + PROCESS_TIME
             }
         };
+        let mut cur_offset = arrive_time;
         let mut time_shift = 0;
         loop { // 考慮 hyper period 中每種狀況
             /*
@@ -151,22 +145,44 @@ fn calculate_offsets(flow: &Flow, all_offsets: &Vec<Vec<f64>>,
              */
             // TODO 搞清楚第二點是為什麼？
             loop {
-                let mut ok = false;
                 let time_shift = time_shift as f64;
-                // TODO 確認沒有其它封包在這裡傳輸
-                gcl.check_overlap(links[i].0, (time_shift + cur_offset) as usize,
-                    (time_shift + cur_offset + trans_time) as usize);
-
-                // TODO 確認傳輸到下個地方後，不會導致一個佇列裝兩個資料流
-
-                if cur_offset >= flow_offset + *flow.max_delay() as f64 {
-                    // 死線爆炸！
-                    return Err(());
-                } else if ok {
-                    break;
+                // NOTE 確認沒有其它封包在這個連線上傳輸
+                let option = gcl.get_next_empty_time(
+                    links[i].0,
+                    (time_shift + cur_offset) as usize,
+                    (time_shift + cur_offset + trans_time) as usize
+                );
+                if let Some(time) = option {
+                    cur_offset = time as f64 - time_shift;
+                    check_deadline(cur_offset, trans_time, flow)?;
+                    continue;
                 }
+                // NOTE 確認傳輸到下個地方時，下個連線的佇列是空的（沒有其它的資料流）
+                if i < links.len() { // 還不到最後一個節點
+                    let option = gcl.get_next_queue_empty_time(
+                        links[i+1].0,
+                        ro[i],
+                        (time_shift + cur_offset + trans_time) as usize
+                    );
+                    if let Some(time) = option {
+                        cur_offset = time as f64 - time_shift;
+                        check_deadline(cur_offset, trans_time, flow)?;
+                        continue;
+                    }
+                }
+                // NOTE 檢查 arrive_time ~ cur_offset+trans_time 這段時間中有沒有發生同個佇列被佔用的事件
+                let can_occupy = gcl.check_can_occupy(
+                    links[i+1].0,
+                    ro[i],
+                    (time_shift + arrive_time) as usize,
+                    (time_shift + cur_offset + trans_time) as usize,
+                );
+                if !can_occupy {
+                    // TODO 這裡真的應該直接回報無法排程嗎？
+                    return Err(());
+                }
+                break;
             }
-
             time_shift += *flow.period();
             if time_shift >= hyper_p {
                 break;
@@ -180,4 +196,14 @@ fn calculate_offsets(flow: &Flow, all_offsets: &Vec<Vec<f64>>,
 
 fn assign_new_queues() -> Result<Vec<u8>, ()> {
     Err(())
+}
+
+#[inline(always)]
+fn check_deadline(cur_offset: f64, trans_time: f64, flow: &Flow) -> Result<(), ()> {
+    if cur_offset + trans_time >= flow.offset() as f64 + *flow.max_delay() as f64 {
+        // 死線爆炸！
+        Err(())
+    } else {
+        Ok(())
+    }
 }

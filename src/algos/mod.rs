@@ -73,6 +73,16 @@ build_shared_enum! {
     }
 }
 
+impl Flow {
+    pub fn offset(&self) -> u32 {
+        if let &Flow::TT { offset, .. } = self {
+            offset
+        } else {
+            panic!("並非TT資料流卻想取 offset");
+        }
+    }
+}
+
 pub trait RoutingAlgo {
     fn compute_routes(&mut self, flows: Vec<Flow>);
     fn get_retouted_flows(&self) -> &Vec<usize>;
