@@ -27,6 +27,7 @@ macro_rules! build_shared_enum {
     (@build_fn $enum_name: ident, $field_name: ident, $field_type: ty,
         [ $($name: ident),* ]
     ) => {
+        #[inline(always)]
         pub fn $field_name(&self) -> &$field_type {
             match self {
                 $($enum_name::$name { $field_name, .. } => $field_name ),*

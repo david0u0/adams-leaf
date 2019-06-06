@@ -124,7 +124,7 @@ impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
             }
             // TODO 這裡是不是有優化的空間?
             let mut spf = Dijkstra::new(&self.g);
-            if let Some((d, postfix)) = spf.get_route(cur_node, last_node) {
+            if let Some((_, postfix)) = spf.get_route(cur_node, last_node) {
                 let mut next_path = prefix.clone();
                 next_path.extend(postfix);
                 let dist = self.g.get_dist(&next_path);

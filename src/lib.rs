@@ -5,6 +5,7 @@ use serde::{Serialize, Deserialize};
 pub mod network_struct;
 pub mod algos;
 pub mod util;
+pub const MAX_QUEUE: u8 = 8;
 
 use algos::{Flow, AVBType};
 

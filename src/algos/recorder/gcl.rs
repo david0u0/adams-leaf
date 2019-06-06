@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
-const MAX_QUEUE: usize = 8;
+use crate::MAX_QUEUE;
+
 pub struct GCL {
     hyper_p: u32,
     // TODO 這個資料結構有優化的空間
-    gate_evt: Vec<Vec<(usize, usize, u8)>>,
-    queue_occupy_evt: Vec<[Vec<(usize, usize)>; MAX_QUEUE]>,
+    gate_evt: Vec<Vec<(u32, u32, u8)>>,
+    queue_occupy_evt: Vec<[Vec<(u32, u32)>; MAX_QUEUE as usize]>,
     queue_map: HashMap<(usize, usize), u8>,
 }
 impl GCL {
@@ -26,18 +27,18 @@ impl GCL {
     }
     /// 回傳 `link_id` 上所有閘門關閉事件。
     /// * `回傳值` - 一個陣列，其內容為 (事件開始時間, 事件持續時間);
-    pub fn get_close_event(&self, link_id: usize) -> &Vec<(usize, usize, u8)> {
+    pub fn get_close_event(&self, link_id: usize) -> &Vec<(u32, u32, u8)> {
         assert!(self.gate_evt.len() > link_id, "GCL: 指定了超出範圍的邊");
         return &self.gate_evt[link_id];
     }
     pub fn insert_gate_evt(&mut self, link_id: usize,
-        queue_id: u8, start_time: usize, duration: usize
+        queue_id: u8, start_time: u32, duration: u32
     ) {
         // FIXME: 應該做個二元搜索再插入
         return self.gate_evt[link_id].push((start_time, duration, queue_id));
     }
     pub fn insert_queue_evt(&mut self, link_id: usize,
-        queue_id: u8, start_time: usize, duration: usize
+        queue_id: u8, start_time: u32, duration: u32
     ) {
         let vec = &mut self.queue_occupy_evt[link_id][queue_id as usize];
         // FIXME: 應該做個二元搜索再插入
@@ -47,8 +48,8 @@ impl GCL {
     /// 
     /// 若否，則回傳 None，應可直接塞進去。若有重疊，則會告知下一個空的時間（但不一定塞得進去）
     pub fn get_next_empty_time(&self, link_id: usize,
-        start: usize, duration: usize
-    ) -> Option<usize> {
+        start: u32, duration: u32
+    ) -> Option<u32> {
         let s1 = self.get_next_spot(link_id, start);
         let s2 = self.get_next_spot(link_id, start+duration);
         if s1.0 != s2.0 {
@@ -62,7 +63,7 @@ impl GCL {
     /// 計算最近的下一個「時間點」，此處的時間點有可能是閘門事件的開啟或結束。
     /// 
     /// 回傳一組資料(usize, bool)，前者代表時間，後者代表該時間是閘門事件的開始還是結束（真代表開始）
-    fn get_next_spot(&self, link_id: usize, time: usize) -> (usize, bool) {
+    fn get_next_spot(&self, link_id: usize, time: u32) -> (u32, bool) {
         // TODO 應該用二元搜索來優化?
         unimplemented!();
     }
@@ -73,8 +74,8 @@ impl GCL {
         self.queue_map.insert((link_id, flow_id), queueid);
     }
     pub fn get_next_queue_empty_time(&self, link_id: usize,
-        queue_id: u8, time: usize,
-    ) -> Option<usize> {
+        queue_id: u8, time: u32,
+    ) -> Option<u32> {
         unimplemented!();
     }
 }

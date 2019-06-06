@@ -50,7 +50,7 @@ fn wcd_on_single_link<T: Clone>(id: usize, size: usize,
     }
     wcd
 }
-fn tt_interfere_avb_single_link(link_id: usize, wcd: f64, gcl: &GCL) -> usize {
+fn tt_interfere_avb_single_link(link_id: usize, wcd: f64, gcl: &GCL) -> u32 {
     let mut i_max = 0;
     let all_gce = gcl.get_close_event(link_id);
     for mut j in 0..all_gce.len() {

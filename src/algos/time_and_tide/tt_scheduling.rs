@@ -1,11 +1,11 @@
 use super::super::{FlowTable, GCL, Flow, StreamAwareGraph};
 use crate::util::YensAlgo;
+use crate::MAX_QUEUE;
 
 type FT = FlowTable<usize>;
 type Yens<'a> = YensAlgo<'a, usize, StreamAwareGraph>;
 
 const MTU: usize = 1000;
-const MAX_QUEUE: u8 = 8;
 const PROCESS_TIME: f64 = 10.0;
 
 /// 一個大小為 size 的資料流要切成幾個封包才夠？
@@ -105,14 +105,33 @@ pub fn schedule_fixed_og(changed_table: &FT,
         for i in 0..links.len() {
             let link_id = links[i].0;
             let queue_id = ro[i];
-            let trans_time = ((MTU as f64) / links[i].1) as usize;
+            let trans_time = ((MTU as f64) / links[i].1) as u32;
             gcl.set_queueid(queue_id, link_id, id);
-            for m in 0..k {
-                gcl.insert_gate_evt(link_id, queue_id, all_offsets[m][i] as usize, trans_time);
-                // insert queue evt
-                let queue_evt_start = if i == 0 { 0 } else { all_offsets[m][i-1] as usize };
-                let queue_evt_end = all_offsets[m][i] as usize + trans_time;
-                gcl.insert_queue_evt(link_id, queue_id, queue_evt_start, queue_evt_end - queue_evt_start);
+            // 考慮 hyper period 中每個狀況
+            let step = *flow.period() as usize;
+            for time_shift in (0..gcl.get_hyper_p()).step_by(step) {
+                for m in 0..k {
+                    // insert gate evt
+                    gcl.insert_gate_evt(
+                        link_id,
+                        queue_id,
+                        time_shift + all_offsets[m][i] as u32, 
+                        time_shift + trans_time);
+                    // insert queue evt
+                    let queue_evt_start = if i == 0 {
+                        flow.offset()
+                    } else {
+                        let prev_trans_time = MTU as f64/ links[i-1].1;
+                        (all_offsets[m][i-1] + prev_trans_time) as u32
+                    };
+                    let queue_evt_duration = queue_evt_start - all_offsets[m][i] as u32;
+                    gcl.insert_queue_evt(
+                        link_id,
+                        queue_id,
+                        time_shift + queue_evt_start,
+                        queue_evt_duration
+                    );
+                }
             }
         }
     }
@@ -150,15 +169,14 @@ fn calculate_offsets(flow: &Flow, all_offsets: &Vec<Vec<f64>>,
              */
             // QUESTION 搞清楚第二點是為什麼？
             loop {
-                let time_shift = time_shift as f64;
                 // NOTE 確認沒有其它封包在這個連線上傳輸
                 let option = gcl.get_next_empty_time(
                     links[i].0,
-                    (time_shift + cur_offset) as usize,
-                    (time_shift + cur_offset + trans_time) as usize
+                    time_shift + cur_offset as u32,
+                    trans_time as u32
                 );
                 if let Some(time) = option {
-                    cur_offset = time as f64 - time_shift;
+                    cur_offset = (time - time_shift) as f64;
                     if miss_deadline(cur_offset, trans_time, flow) {
                         return offsets;
                     }
@@ -169,10 +187,10 @@ fn calculate_offsets(flow: &Flow, all_offsets: &Vec<Vec<f64>>,
                     let option = gcl.get_next_queue_empty_time(
                         links[i+1].0,
                         ro[i],
-                        (time_shift + cur_offset + trans_time) as usize
+                        time_shift + (cur_offset + trans_time) as u32
                     );
                     if let Some(time) = option {
-                        cur_offset = time as f64 - time_shift;
+                        cur_offset = (time - time_shift) as f64;
                         if miss_deadline(cur_offset, trans_time, flow) {
                             return offsets;
                         }
@@ -206,7 +224,7 @@ fn assign_new_queues(ro: &mut Vec<u8>) -> Result<(), ()> {
 
 #[inline(always)]
 fn miss_deadline(cur_offset: f64, trans_time: f64, flow: &Flow) -> bool {
-    if cur_offset + trans_time >= flow.offset() as f64 + *flow.max_delay() as f64 {
+    if cur_offset + trans_time >= (flow.offset() + *flow.max_delay()) as f64 {
         // 死線爆炸！
         true
     } else {
