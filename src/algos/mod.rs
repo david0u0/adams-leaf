@@ -101,8 +101,8 @@ pub use routing_optimism::RO;
 mod aco;
 pub use aco::ACO;
 
-mod table_struct;
-pub use table_struct::{FlowTable, GCL};
+mod recorder;
+pub use recorder::{FlowTable, GCL};
 
 mod cost_calculator;
 pub use cost_calculator::CostCalculator;
