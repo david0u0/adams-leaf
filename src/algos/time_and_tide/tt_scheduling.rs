@@ -5,15 +5,16 @@ type FT = FlowTable<usize>;
 type Yens<'a> = YensAlgo<'a, usize, StreamAwareGraph>;
 
 const MTU: usize = 1000;
+const MAX_QUEUE: u8 = 8;
 const PROCESS_TIME: f64 = 10.0;
 
 /// 一個大小為 size 的資料流要切成幾個封包才夠？
 #[inline(always)]
-fn get_frame_cnt(size: usize) -> u8 {
+fn get_frame_cnt(size: usize) -> usize {
     if size % MTU == 0 {
-        (size / MTU) as u8
+        size / MTU
     } else {
-        (size / MTU + 1) as u8
+        size / MTU + 1
     }
 }
 
@@ -85,36 +86,43 @@ pub fn schedule_fixed_og(changed_table: &FT,
         let route = get_route(flow, changed_table, yens);
         let links = g.get_edges_id_bandwidth(route);
         let mut all_offsets: Vec<Vec<f64>> = vec![];
-        let mut ro = vec![0; route.len()];
+        // NOTE 一個資料流的每個封包，在單一埠口上必需採用同一個佇列
+        let mut ro: Vec<u8> = vec![0; links.len()];
         let k = get_frame_cnt(*flow.size());
         let mut m = 0;
         while m < k {
-            let res = calculate_offsets(flow, &all_offsets, &links, &ro, gcl);
-            if let Ok(offsets) = res {
+            let offsets = calculate_offsets(flow, &all_offsets, &links, &ro, gcl);
+            if offsets.len() == links.len() {
                 m += 1;
                 all_offsets.push(offsets);
             } else {
                 m = 0;
                 all_offsets.clear();
-                let res = assign_new_queues();
-                ro = {
-                    if let Ok(new_ro) = res {
-                        new_ro
-                    } else {
-                        return Err(());
-                    }
-                }
+                assign_new_queues(&mut ro)?;
             }
-            // TODO 把上面算好的結果塞進 GCL
+        }
+        // 把上面算好的結果塞進 GCL
+        for i in 0..links.len() {
+            let link_id = links[i].0;
+            let queue_id = ro[i];
+            let trans_time = ((MTU as f64) / links[i].1) as usize;
+            gcl.set_queueid(queue_id, link_id, id);
+            for m in 0..k {
+                gcl.insert_gate_evt(link_id, queue_id, all_offsets[m][i] as usize, trans_time);
+                // insert queue evt
+                let queue_evt_start = if i == 0 { 0 } else { all_offsets[m][i-1] as usize };
+                let queue_evt_end = all_offsets[m][i] as usize + trans_time;
+                gcl.insert_queue_evt(link_id, queue_id, queue_evt_start, queue_evt_end - queue_evt_start);
+            }
         }
     }
     Ok(())
 }
 
-/// 回傳值為若為 Err，代表當前的佇列分配不足以完成排程
+/// 回傳值為為一個陣列，若其長度小於路徑長，代表排一排爆開
 fn calculate_offsets(flow: &Flow, all_offsets: &Vec<Vec<f64>>,
     links: &Vec<(usize, f64)>, ro: &Vec<u8>, gcl: &GCL
-) -> Result<Vec<f64>, ()> {
+) -> Vec<f64> {
     let mut offsets = Vec::<f64>::with_capacity(links.len());
     let hyper_p = gcl.get_hyper_p();
     for i in 0..links.len() {
@@ -140,7 +148,7 @@ fn calculate_offsets(flow: &Flow, all_offsets: &Vec<Vec<f64>>,
              * 2. 同個佇列一個時間只能容納一個資料流（但可能容納該資料流的數個封包）
              * 3. 要符合 max_delay 的需求
              */
-            // TODO 搞清楚第二點是為什麼？
+            // QUESTION 搞清楚第二點是為什麼？
             loop {
                 let time_shift = time_shift as f64;
                 // NOTE 確認沒有其它封包在這個連線上傳輸
@@ -151,7 +159,9 @@ fn calculate_offsets(flow: &Flow, all_offsets: &Vec<Vec<f64>>,
                 );
                 if let Some(time) = option {
                     cur_offset = time as f64 - time_shift;
-                    check_deadline(cur_offset, trans_time, flow)?;
+                    if miss_deadline(cur_offset, trans_time, flow) {
+                        return offsets;
+                    }
                     continue;
                 }
                 // NOTE 確認傳輸到下個地方時，下個連線的佇列是空的（沒有其它的資料流）
@@ -163,24 +173,15 @@ fn calculate_offsets(flow: &Flow, all_offsets: &Vec<Vec<f64>>,
                     );
                     if let Some(time) = option {
                         cur_offset = time as f64 - time_shift;
-                        check_deadline(cur_offset, trans_time, flow)?;
+                        if miss_deadline(cur_offset, trans_time, flow) {
+                            return offsets;
+                        }
                         continue;
                     }
                 }
-                // NOTE 檢查 arrive_time ~ cur_offset+trans_time 這段時間中有沒有發生同個佇列被佔用的事件
-                // FIXME 應該提到最外面，用最後的 cur_offset 對 hyper period 中所有狀況做一次總檢查才對
-                let can_occupy = gcl.check_can_occupy(
-                    links[i+1].0,
-                    ro[i],
-                    (time_shift + arrive_time) as usize,
-                    (time_shift + cur_offset + trans_time) as usize,
-                );
-                if !can_occupy {
-                    // TODO 這裡真的應該直接回報無法排程嗎？
-                    return Err(());
-                }
                 break;
             }
+            // QUESTION 是否要檢查 arrive_time ~ cur_offset+trans_time 這段時間中有沒有發生同個佇列被佔用的事件？
             time_shift += *flow.period();
             if time_shift >= hyper_p {
                 break;
@@ -188,19 +189,27 @@ fn calculate_offsets(flow: &Flow, all_offsets: &Vec<Vec<f64>>,
         }
         offsets.push(cur_offset);
     }
-    Ok(offsets)
+    offsets
 }
 
-fn assign_new_queues() -> Result<Vec<u8>, ()> {
-    Err(())
+fn assign_new_queues(ro: &mut Vec<u8>) -> Result<(), ()> {
+    // TODO 好好實作這個函式（目前一個資料流只安排個佇列，但在不同埠口上應該可以安排給不同佇列）
+    if ro[0] == MAX_QUEUE-1 {
+        Err(())
+    } else {
+        for i in 0..ro.len() {
+            ro[i] += 1;
+        }
+        Ok(())
+    }
 }
 
 #[inline(always)]
-fn check_deadline(cur_offset: f64, trans_time: f64, flow: &Flow) -> Result<(), ()> {
+fn miss_deadline(cur_offset: f64, trans_time: f64, flow: &Flow) -> bool {
     if cur_offset + trans_time >= flow.offset() as f64 + *flow.max_delay() as f64 {
         // 死線爆炸！
-        Err(())
+        true
     } else {
-        Ok(())
+        false
     }
 }

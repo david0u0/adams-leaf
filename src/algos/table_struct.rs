@@ -189,6 +189,13 @@ impl GCL {
         // FIXME: 應該做個二元搜索再插入
         return self.gate_evt[link_id].push((start_time, duration, queue_id));
     }
+    pub fn insert_queue_evt(&mut self, link_id: usize,
+        queue_id: u8, start_time: usize, duration: usize
+    ) {
+        let vec = &mut self.queue_occupy_evt[link_id][queue_id as usize];
+        // FIXME: 應該做個二元搜索再插入
+        vec.push((start_time, duration));
+    }
     /// 會先確認 start~(start+duration) 這段時間中有沒有與其它事件重疊
     /// 
     /// 若否，則回傳 None，應可直接塞進去。若有重疊，則會告知下一個空的時間（但不一定塞得進去）
@@ -212,20 +219,15 @@ impl GCL {
         // TODO 應該用二元搜索來優化?
         unimplemented!();
     }
-    pub fn get_queueid(&self, edge_id: usize, flow_id: usize) -> u8 {
-        *self.queue_map.get(&(edge_id, flow_id)).unwrap()
+    pub fn get_queueid(&self, link_id: usize, flow_id: usize) -> u8 {
+        *self.queue_map.get(&(link_id, flow_id)).unwrap()
     }
-    pub fn set_queueid(&mut self, queueid: u8, edge_id: usize, flow_id: usize) {
-        self.queue_map.insert((edge_id, flow_id), queueid);
+    pub fn set_queueid(&mut self, queueid: u8, link_id: usize, flow_id: usize) {
+        self.queue_map.insert((link_id, flow_id), queueid);
     }
     pub fn get_next_queue_empty_time(&self, link_id: usize,
         queue_id: u8, time: usize,
     ) -> Option<usize> {
-        unimplemented!();
-    }
-    pub fn check_can_occupy(&self, link_id: usize,
-        queue_id: u8, start: usize, duration: usize
-    ) -> bool {
         unimplemented!();
     }
 }
