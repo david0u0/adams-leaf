@@ -40,9 +40,9 @@ impl GCL {
     pub fn insert_queue_evt(&mut self, link_id: usize,
         queue_id: u8, start_time: u32, duration: u32
     ) {
-        let vec = &mut self.queue_occupy_evt[link_id][queue_id as usize];
+        let evts = &mut self.queue_occupy_evt[link_id][queue_id as usize];
         // FIXME: 應該做個二元搜索再插入
-        vec.push((start_time, duration));
+        evts.push((start_time, duration));
     }
     /// 會先確認 start~(start+duration) 這段時間中有沒有與其它事件重疊
     /// 
@@ -65,7 +65,14 @@ impl GCL {
     /// 回傳一組資料(usize, bool)，前者代表時間，後者代表該時間是閘門事件的開始還是結束（真代表開始）
     fn get_next_spot(&self, link_id: usize, time: u32) -> (u32, bool) {
         // TODO 應該用二元搜索來優化?
-        unimplemented!();
+        for &(start, end, _) in self.gate_evt[link_id].iter() {
+            if start >= time {
+                return (start, true);
+            } else if end >= time {
+                return (end, false);
+            }
+        }
+        (time, false)
     }
     pub fn get_queueid(&self, link_id: usize, flow_id: usize) -> u8 {
         *self.queue_map.get(&(link_id, flow_id)).unwrap()
@@ -73,9 +80,18 @@ impl GCL {
     pub fn set_queueid(&mut self, queueid: u8, link_id: usize, flow_id: usize) {
         self.queue_map.insert((link_id, flow_id), queueid);
     }
-    pub fn get_next_queue_empty_time(&self, link_id: usize,
-        queue_id: u8, time: u32,
+    /// 回傳 None 者，代表當前即是空的
+    pub fn get_next_queue_empty_time(&self,
+        link_id: usize, queue_id: u8, time: u32,
     ) -> Option<u32> {
-        unimplemented!();
+        let evts = &self.queue_occupy_evt[link_id][queue_id as usize];
+        for &(start, end) in evts.iter() {
+            if start >= time && end < time {
+                return Some(end);
+            } else if end >= time {
+                return None;
+            }
+        }
+        None
     }
 }

@@ -1,9 +1,7 @@
-use super::super::{FlowTable, GCL, Flow, StreamAwareGraph};
-use crate::util::YensAlgo;
+use super::super::{FlowTable as FT, GCL, Flow, StreamAwareGraph};
 use crate::MAX_QUEUE;
 
-type FT = FlowTable<usize>;
-type Yens<'a> = YensAlgo<'a, usize, StreamAwareGraph>;
+type Links = Vec<(usize, f64)>;
 
 const MTU: usize = 1000;
 const PROCESS_TIME: f64 = 10.0;
@@ -18,17 +16,14 @@ fn get_frame_cnt(size: usize) -> usize {
     }
 }
 
-fn get_route<'a> (flow: &'a Flow, table: &'a FT, yens: &'a Yens) -> &'a Vec<usize> {
-    let k = *table.get_info(*flow.id());
-    yens.get_kth_route(*flow.src(), *flow.dst(), k)
-}
-
 use std::cmp::Ordering;
 /// 排序的標準：
 /// * `deadline` - 時間較緊的要排前面
 /// * `period` - 週期短的要排前面
 /// * `route length` - 路徑長的要排前面
-fn cmp_flow(id1: usize, id2: usize, table: &FT, yens: &Yens) -> Ordering {
+fn cmp_flow<'a, T: Clone, F: Fn(&Flow, &T) -> &'a Links> (
+    id1: usize, id2: usize, table: &FT<T>, get_links: &F
+) -> Ordering {
     let flow1 = table.get_flow(id1);
     let flow2 = table.get_flow(id2);
     if flow1.max_delay() < flow2.max_delay() {
@@ -41,8 +36,10 @@ fn cmp_flow(id1: usize, id2: usize, table: &FT, yens: &Yens) -> Ordering {
         } else if flow1.period() > flow2.period() {
             Ordering::Greater
         } else {
-            let rlen_1 = get_route(flow1, table, yens).len();
-            let rlen_2 = get_route(flow2, table, yens).len();
+            let k = table.get_info(*flow1.id());
+            let rlen_1 = get_links(&flow1, k).len();
+            let k = table.get_info(*flow2.id());
+            let rlen_2 = get_links(&flow2, k).len();
             if rlen_1 > rlen_2 {
                 Ordering::Less
             } else {
@@ -57,34 +54,35 @@ fn cmp_flow(id1: usize, id2: usize, table: &FT, yens: &Yens) -> Ordering {
 /// * `changed_table` - 被改動到的那部份資料流，包含新增與換路徑
 /// * `gcl` - 本來的 Gate Control List
 /// * `yens` - Yen's algorithm 的物件，因為真正的路徑資訊記錄在這裡面
-pub fn schedule_online(og_table: &FT,
-    changed_table: &FT, gcl: &mut GCL, yens: &Yens
+pub fn schedule_online<'a, T: Clone, F: Fn(&Flow, &T) -> &'a Links>(
+    og_table: &'a FT<T>, changed_table: &FT<T>,
+    gcl: &mut GCL, get_links: &'a F
 ) -> Result<(), ()> {
-    let result = schedule_fixed_og(changed_table, gcl, yens);
+    let result = schedule_fixed_og(changed_table, gcl, get_links);
     if !result.is_ok() {
         gcl.clear();
-        let union_table = og_table.union(true, changed_table);
-        schedule_fixed_og(&union_table, gcl, yens)?;
+        let union_table = og_table.union(true, &changed_table);
+        schedule_fixed_og(&union_table, gcl, get_links)?;
     }
     Ok(())
 }
 
 /// 也可以當作離線排程算法來使用
-pub fn schedule_fixed_og(changed_table: &FT,
-    gcl: &mut GCL, yens: &Yens
+pub fn schedule_fixed_og<'a, T: Clone, F: Fn(&Flow, &T) -> &'a Links>(
+    changed_table: &FT<T>, gcl: &mut GCL, get_links: &F
 ) -> Result<(), ()> {
     let mut tt_flows = Vec::<usize>::new();
-    let g = yens.get_graph();
     changed_table.foreach(false, |flow, _| {
-        tt_flows.push(*flow.id());
+        if let Flow::TT { .. } = flow {
+            tt_flows.push(*flow.id());
+        }
     });
     tt_flows.sort_by(|&id1, &id2| {
-        cmp_flow(id1, id2, changed_table, yens)
+        cmp_flow(id1, id2, changed_table, get_links)
     });
     for id in tt_flows.into_iter() {
         let flow = changed_table.get_flow(id);
-        let route = get_route(flow, changed_table, yens);
-        let links = g.get_edges_id_bandwidth(route);
+        let links = get_links(flow, changed_table.get_info(id));
         let mut all_offsets: Vec<Vec<f64>> = vec![];
         // NOTE 一個資料流的每個封包，在單一埠口上必需採用同一個佇列
         let mut ro: Vec<u8> = vec![0; links.len()];
@@ -230,4 +228,9 @@ fn miss_deadline(cur_offset: f64, trans_time: f64, flow: &Flow) -> bool {
     } else {
         false
     }
+}
+
+#[cfg(test)]
+mod test {
+
 }
