@@ -221,7 +221,7 @@ impl OnOffGraph<usize> for StreamAwareGraph {
 }
 
 impl StreamAwareGraph {
-    /// 確定一條資料流的路徑時，將該資料流的ID記憶在它經過的邊上，改變資料流的路徑時則將ID遺忘。
+    /// 確定一條資料流的路徑時，將該資料流的ID記憶在它經過的邊上，移除路徑時則將ID遺忘。
     /// 
     /// __注意：此處兩個方向不視為同個邊！__
     /// * `remember` - 布林值，記憶或是遺忘路徑

@@ -18,7 +18,7 @@ fn main() -> Result<(), String> {
 
     let flows = read_flows_from_file(0, "flows.json");
     let mut gcl = GCL::new(100, g.get_edge_cnt());
-    gcl.insert_close_event(9, 0, 100); // 4 -> 2
+    gcl.insert_gate_evt(9, 0, 0, 100); // 4 -> 2
 
     let mut algo = RO::new(&g, 100, gcl);
 

@@ -50,13 +50,13 @@ impl <'a> RO<'a> {
             route,
             &self.flow_table,
             &self.gcl
-        ) as f64;
+        );
         let c1 = if latency > max_delay {
             C1_EXCEED
         } else {
             0.0
         };
-        let c2 = latency / max_delay;
+        let c2 = latency as f64 / max_delay as f64;
         let c3 = 0.0; // TODO 計算 c3
         W1*c1 + W2*c2 + W3*c3
     }

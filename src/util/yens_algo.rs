@@ -51,6 +51,9 @@ impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
             panic!("先運行 compute_routes");
         }
     }
+    pub fn get_graph(&self) -> &G {
+        &self.g
+    }
     pub fn compute_routes(&mut self, src: K, dst: K) {
         if self.route_table.contains_key(&(src, dst)) {
             return;
@@ -121,7 +124,7 @@ impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
             }
             // TODO 這裡是不是有優化的空間?
             let mut spf = Dijkstra::new(&self.g);
-            if let Some((d, postfix)) = spf.get_route(cur_node, last_node) {
+            if let Some((_, postfix)) = spf.get_route(cur_node, last_node) {
                 let mut next_path = prefix.clone();
                 next_path.extend(postfix);
                 let dist = self.g.get_dist(&next_path);

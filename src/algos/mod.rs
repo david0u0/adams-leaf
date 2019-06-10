@@ -27,6 +27,7 @@ macro_rules! build_shared_enum {
     (@build_fn $enum_name: ident, $field_name: ident, $field_type: ty,
         [ $($name: ident),* ]
     ) => {
+        #[inline(always)]
         pub fn $field_name(&self) -> &$field_type {
             match self {
                 $($enum_name::$name { $field_name, .. } => $field_name ),*
@@ -59,17 +60,27 @@ impl AVBType {
 build_shared_enum! { 
     Flow {
         id: usize,
-        size: u32,
+        size: usize,
         src: usize,
         dst: usize,
         period: u32,
-        max_delay: f64
+        max_delay: u32
     },
     AVB {
         avb_type: AVBType
     },
     TT {
         offset: u32
+    }
+}
+
+impl Flow {
+    pub fn offset(&self) -> u32 {
+        if let &Flow::TT { offset, .. } = self {
+            offset
+        } else {
+            panic!("並非TT資料流卻想取 offset");
+        }
     }
 }
 
@@ -91,8 +102,8 @@ pub use routing_optimism::RO;
 mod aco;
 pub use aco::ACO;
 
-mod table_struct;
-pub use table_struct::{FlowTable, GCL};
+mod recorder;
+pub use recorder::{FlowTable, GCL};
 
 mod cost_calculator;
 pub use cost_calculator::CostCalculator;

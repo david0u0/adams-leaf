@@ -5,6 +5,7 @@ use serde::{Serialize, Deserialize};
 pub mod network_struct;
 pub mod algos;
 pub mod util;
+pub const MAX_QUEUE: u8 = 8;
 
 use algos::{Flow, AVBType};
 
@@ -54,19 +55,19 @@ struct AllFlows {
 }
 #[derive(Serialize, Deserialize)]
 struct TTFlow {
-    size: u32,
+    size: usize,
     src: usize,
     dst: usize,
     period: u32,
-    max_delay: f64,
-    offset: u32
+    max_delay: u32,
+    offset: u32,
 }
 #[derive(Serialize, Deserialize)]
 struct AVBFlow {
-    size: u32,
+    size: usize,
     src: usize,
     dst: usize,
     period: u32,
-    max_delay: f64,
+    max_delay: u32,
     avb_type: char
 }

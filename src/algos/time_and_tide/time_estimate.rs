@@ -12,7 +12,7 @@ const MAX_BE_SIZE: f64 = 1522.0;
 /// * `gcl` - 所有 TT 資料流的 Gate Control List
 pub fn compute_avb_latency<T: Clone>(g: &StreamAwareGraph, flow: &Flow,
     route: &Vec<usize>, flow_table: &FlowTable<T>, gcl: &GCL
-) -> f64 {
+) -> u32 {
     if let Flow::AVB { id, size, avb_type, .. } = flow {
         let overlap_flow_id = g.get_overlap_flows(route);
         let mut end_to_end_lanency = 0.0;
@@ -22,12 +22,12 @@ pub fn compute_avb_latency<T: Clone>(g: &StreamAwareGraph, flow: &Flow,
             end_to_end_lanency += wcd + tt_interfere_avb_single_link(
                 link_id, wcd as f64, gcl) as f64;
         }
-        end_to_end_lanency
+        end_to_end_lanency as u32
     } else {
         panic!("並非 AVB 資料流！");
     }
 }
-fn wcd_on_single_link<T: Clone>(id: usize, size: u32,
+fn wcd_on_single_link<T: Clone>(id: usize, size: usize,
     self_type: AVBType, bandwidth: f64,
     flow_table: &FlowTable<T>, overlap_flow_id: &Vec<usize>
 ) -> f64 {
@@ -50,9 +50,9 @@ fn wcd_on_single_link<T: Clone>(id: usize, size: u32,
     }
     wcd
 }
-fn tt_interfere_avb_single_link(link_id: usize, wcd: f64, gcl: &GCL) -> usize {
+fn tt_interfere_avb_single_link(link_id: usize, wcd: f64, gcl: &GCL) -> u32 {
     let mut i_max = 0;
-    let all_gce = gcl.get_close_event(link_id);
+    let all_gce = gcl.get_gate_events(link_id);
     for mut j in 0..all_gce.len() {
         let (mut i_cur, mut rem) = (0, wcd as i32);
         while rem >= 0 {
@@ -84,17 +84,17 @@ mod test {
         let flows = vec![
             Flow::AVB {
                 id: 0, src: 0, dst: 2, size: 75,
-                period: 10000, max_delay: 200.0,
+                period: 10000, max_delay: 200,
                 avb_type: AVBType::new_type_a()
             },
             Flow::AVB {
                 id: 1, src: 0, dst: 2, size: 150,
-                period: 10000, max_delay: 200.0,
+                period: 10000, max_delay: 200,
                 avb_type: AVBType::new_type_a()
             },
             Flow::AVB {
                 id: 2, src: 0, dst: 2, size: 75,
-                period: 10000, max_delay: 200.0,
+                period: 10000, max_delay: 200,
                 avb_type: AVBType::new_type_b()
             }
         ];
@@ -126,12 +126,12 @@ mod test {
         flow_table.insert(vec![flows[0].clone()], 0);
         g.save_flowid_on_edge(true, 0, &vec![0, 1, 2]);
         assert_eq!(compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
-            (MAX_BE_SIZE/100.0 + 1.0) * 2.0);
+            ((MAX_BE_SIZE/100.0 + 1.0) * 2.0) as u32);
 
         flow_table.insert(vec![flows[1].clone()], 0);
         g.save_flowid_on_edge(true, 1, &vec![0, 1, 2]);
         assert_eq!(compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
-            (MAX_BE_SIZE/100.0 + 1.0 + 2.0) * 2.0);
+            ((MAX_BE_SIZE/100.0 + 1.0 + 2.0) * 2.0) as u32);
     }
     #[test]
     fn test_endtoend_avb_with_gcl() { // 其實已經接近整合測試了 @@
@@ -142,24 +142,24 @@ mod test {
         flow_table.insert(vec![flows[1].clone()], 0);
         g.save_flowid_on_edge(true, 1, &vec![0, 1, 2]);
 
-        gcl.insert_close_event(0, 0, 10);
+        gcl.insert_gate_evt(0, 0, 0, 10);
         assert_eq!(compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
-            (MAX_BE_SIZE/100.0 + 1.0 + 2.0) * 2.0 + 10.0);
+            ((MAX_BE_SIZE/100.0 + 1.0 + 2.0) * 2.0 + 10.0) as u32);
 
-        gcl.insert_close_event(0, 15, 5);
+        gcl.insert_gate_evt(0, 0, 15, 5);
         assert_eq!(compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
-            (MAX_BE_SIZE/100.0 + 1.0 + 2.0) * 2.0 + 15.0);
+            ((MAX_BE_SIZE/100.0 + 1.0 + 2.0) * 2.0 + 15.0) as u32);
 
-        gcl.insert_close_event(2, 100, 100);
+        gcl.insert_gate_evt(2, 0, 100, 100);
         // 雖然這個關閉事件跟前面兩個不可能同時發生，但為了計算快速，還是假裝全部都發生了
         assert_eq!(compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
-            (MAX_BE_SIZE/100.0 + 1.0 + 2.0) * 2.0 + 115.0);
+            ((MAX_BE_SIZE/100.0 + 1.0 + 2.0) * 2.0 + 115.0) as u32);
         
-        gcl.insert_close_event(0, 100, 100);
+        gcl.insert_gate_evt(0, 0, 100, 100);
         // 這個事件與同個埠口上的前兩個事件不可能同時發生，選比較久的（即這個事件）
         assert_eq!(compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
-            (MAX_BE_SIZE/100.0 + 1.0 + 2.0) * 2.0 + 200.0);
+            ((MAX_BE_SIZE/100.0 + 1.0 + 2.0) * 2.0 + 200.0) as u32);
         assert_eq!(compute_avb_latency(&g, &flows[1], &vec![0, 1, 2], &flow_table, &gcl),
-            (MAX_BE_SIZE/100.0 + 2.0 + 1.0) * 2.0 + 200.0);
+            ((MAX_BE_SIZE/100.0 + 2.0 + 1.0) * 2.0 + 200.0) as u32);
     }
 }
