@@ -1,10 +1,9 @@
-use super::super::{FlowTable as FT, GCL, Flow, StreamAwareGraph};
+use super::super::{FlowTable as FT, GCL, Flow};
 use crate::MAX_QUEUE;
 
 type Links = Vec<(usize, f64)>;
 
 const MTU: usize = 1000;
-const PROCESS_TIME: f64 = 10.0;
 
 /// 一個大小為 size 的資料流要切成幾個封包才夠？
 #[inline(always)]
@@ -21,8 +20,8 @@ use std::cmp::Ordering;
 /// * `deadline` - 時間較緊的要排前面
 /// * `period` - 週期短的要排前面
 /// * `route length` - 路徑長的要排前面
-fn cmp_flow<'a, T: Clone, F: Fn(&Flow, &T) -> &'a Links> (
-    id1: usize, id2: usize, table: &FT<T>, get_links: &F
+fn cmp_flow<'a, T: Clone, F: Fn(&'a Flow, &'a T) -> &'a Links> (
+    id1: usize, id2: usize, table: &'a FT<T>, get_links: F
 ) -> Ordering {
     let flow1 = table.get_flow(id1);
     let flow2 = table.get_flow(id2);
@@ -53,23 +52,22 @@ fn cmp_flow<'a, T: Clone, F: Fn(&Flow, &T) -> &'a Links> (
 /// * `og_table` - 本來的資料流表
 /// * `changed_table` - 被改動到的那部份資料流，包含新增與換路徑
 /// * `gcl` - 本來的 Gate Control List
-/// * `yens` - Yen's algorithm 的物件，因為真正的路徑資訊記錄在這裡面
-pub fn schedule_online<'a, T: Clone, F: Fn(&Flow, &T) -> &'a Links>(
-    og_table: &'a FT<T>, changed_table: &FT<T>,
-    gcl: &mut GCL, get_links: &'a F
+pub fn schedule_online<'a, T: Clone+'a, F: Fn(&'a Flow, &'a T) -> &'a Links>(
+    og_table: &'a FT<T>, changed_table: &'a FT<T>,
+    gcl: &mut GCL, get_links: F
 ) -> Result<(), ()> {
-    let result = schedule_fixed_og(changed_table, gcl, get_links);
+    let result = schedule_fixed_og(changed_table, gcl, |f, t| get_links(f, t));
     if !result.is_ok() {
         gcl.clear();
         let union_table = og_table.union(true, &changed_table);
-        schedule_fixed_og(&union_table, gcl, get_links)?;
+        //schedule_fixed_og(&union_table, gcl, |f, t| get_links(f, t))?;
     }
     Ok(())
 }
 
 /// 也可以當作離線排程算法來使用
-pub fn schedule_fixed_og<'a, T: Clone, F: Fn(&Flow, &T) -> &'a Links>(
-    changed_table: &FT<T>, gcl: &mut GCL, get_links: &F
+pub fn schedule_fixed_og<'a, T: Clone+'a, F: Fn(&'a Flow, &'a T) -> &'a Links>(
+    changed_table: &'a FT<T>, gcl: &mut GCL, get_links: F
 ) -> Result<(), ()> {
     let mut tt_flows = Vec::<usize>::new();
     changed_table.foreach(false, |flow, _| {
@@ -78,7 +76,7 @@ pub fn schedule_fixed_og<'a, T: Clone, F: Fn(&Flow, &T) -> &'a Links>(
         }
     });
     tt_flows.sort_by(|&id1, &id2| {
-        cmp_flow(id1, id2, changed_table, get_links)
+        cmp_flow(id1, id2, changed_table, |f, t| get_links(f, t))
     });
     for id in tt_flows.into_iter() {
         let flow = changed_table.get_flow(id);
@@ -106,15 +104,15 @@ pub fn schedule_fixed_og<'a, T: Clone, F: Fn(&Flow, &T) -> &'a Links>(
             let trans_time = ((MTU as f64) / links[i].1) as u32;
             gcl.set_queueid(queue_id, link_id, id);
             // 考慮 hyper period 中每個狀況
-            let step = *flow.period() as usize;
-            for time_shift in (0..gcl.get_hyper_p()).step_by(step) {
+            let p = *flow.period() as usize;
+            for time_shift in (0..gcl.get_hyper_p()).step_by(p) {
                 for m in 0..k {
                     // insert gate evt
                     gcl.insert_gate_evt(
                         link_id,
                         queue_id,
                         time_shift + all_offsets[m][i] as u32, 
-                        time_shift + trans_time);
+                        trans_time);
                     // insert queue evt
                     let queue_evt_start = if i == 0 {
                         flow.offset()
@@ -122,7 +120,7 @@ pub fn schedule_fixed_og<'a, T: Clone, F: Fn(&Flow, &T) -> &'a Links>(
                         let prev_trans_time = MTU as f64/ links[i-1].1;
                         (all_offsets[m][i-1] + prev_trans_time) as u32
                     };
-                    let queue_evt_duration = queue_evt_start - all_offsets[m][i] as u32;
+                    let queue_evt_duration = all_offsets[m][i] as u32 - queue_evt_start;
                     gcl.insert_queue_evt(
                         link_id,
                         queue_id,
@@ -144,22 +142,27 @@ fn calculate_offsets(flow: &Flow, all_offsets: &Vec<Vec<f64>>,
     let hyper_p = gcl.get_hyper_p();
     for i in 0..links.len() {
         let trans_time = MTU as f64 / links[i].1;
-        let arrive_time = {
-            if i == 0 {
-                if all_offsets.len() == 0 {
-                    flow.offset() as f64
-                } else {
-                    // #m-1 封包完整送出
-                    all_offsets[all_offsets.len()-1][i] + trans_time
-                }
+        let arrive_time = if i == 0 { // 路徑起始
+            if all_offsets.len() == 0 { // 資料流的第一個封包
+                flow.offset() as f64
             } else {
-                // #m 封包送達，且經過處理時間
-                offsets[i-1] + MTU as f64 / links[i-1].1 + PROCESS_TIME
+                // #m-1 封包完整送出，且經過處理時間
+                all_offsets[all_offsets.len()-1][i] + trans_time
+            }
+        } else {
+            // #m 封包送達，且經過處理時間
+            let a = offsets[i-1] + MTU as f64 / links[i-1].1;
+            if all_offsets.len() == 0 {
+                a
+            } else {
+                // #m-1 封包完整送出，且經過處理時間
+                let b = all_offsets[all_offsets.len()-1][i] + trans_time;
+                if a > b { a } else { b }
             }
         };
         let mut cur_offset = arrive_time;
-        let mut time_shift = 0;
-        loop { // 考慮 hyper period 中每種狀況
+        let p = *flow.period() as usize;
+        for time_shift in (0..hyper_p).step_by(p) { // 考慮 hyper period 中每種狀況
             /*
              * 1. 每個連結一個時間只能傳輸一個封包
              * 2. 同個佇列一個時間只能容納一個資料流（但可能容納該資料流的數個封包）
@@ -181,7 +184,7 @@ fn calculate_offsets(flow: &Flow, all_offsets: &Vec<Vec<f64>>,
                     continue;
                 }
                 // NOTE 確認傳輸到下個地方時，下個連線的佇列是空的（沒有其它的資料流）
-                if i < links.len() { // 還不到最後一個節點
+                if i < links.len()-1 { // 還不到最後一個節點
                     let option = gcl.get_next_queue_empty_time(
                         links[i+1].0,
                         ro[i],
@@ -198,10 +201,6 @@ fn calculate_offsets(flow: &Flow, all_offsets: &Vec<Vec<f64>>,
                 break;
             }
             // QUESTION 是否要檢查 arrive_time ~ cur_offset+trans_time 這段時間中有沒有發生同個佇列被佔用的事件？
-            time_shift += *flow.period();
-            if time_shift >= hyper_p {
-                break;
-            }
         }
         offsets.push(cur_offset);
     }
@@ -231,6 +230,4 @@ fn miss_deadline(cur_offset: f64, trans_time: f64, flow: &Flow) -> bool {
 }
 
 #[cfg(test)]
-mod test {
-
-}
+mod test;

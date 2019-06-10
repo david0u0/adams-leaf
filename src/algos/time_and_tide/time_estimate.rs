@@ -52,7 +52,7 @@ fn wcd_on_single_link<T: Clone>(id: usize, size: usize,
 }
 fn tt_interfere_avb_single_link(link_id: usize, wcd: f64, gcl: &GCL) -> u32 {
     let mut i_max = 0;
-    let all_gce = gcl.get_close_event(link_id);
+    let all_gce = gcl.get_gate_events(link_id);
     for mut j in 0..all_gce.len() {
         let (mut i_cur, mut rem) = (0, wcd as i32);
         while rem >= 0 {
