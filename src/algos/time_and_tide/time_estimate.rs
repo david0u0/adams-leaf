@@ -74,7 +74,6 @@ fn tt_interfere_avb_single_link(link_id: usize, wcd: f64, gcl: &GCL) -> u32 {
 #[cfg(test)]
 mod test {
     use super::*;
-    use super::super::*;
     use crate::network_struct::*;
     fn init_settings() -> (StreamAwareGraph, Vec<Flow>, FlowTable<usize>, GCL) {
         let mut g = StreamAwareGraph::new();

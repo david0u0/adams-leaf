@@ -1,8 +1,7 @@
 extern crate rand;
 use std::collections::BinaryHeap;
 use rand::Rng;
-
-const MAX_K: usize = 10;
+use crate::MAX_K;
 
 const R: usize = 50;
 const L: usize = 7;
@@ -83,6 +82,7 @@ pub struct ACO {
 
 impl ACO {
     pub fn new(state: Vec<usize>, k: usize, tao0: Option<f64>) -> Self {
+        assert!(k <= MAX_K, "K值必需在{}以下", MAX_K);
         let tao0 = {
             if let Some(t) = tao0 {
                 t
@@ -217,7 +217,7 @@ mod test {
     #[test]
     fn test_ant_aco1() {
         let mut aco = ACO::new(vec![0; 10], 2, None);
-        aco.routine_aco(20, &vec![[1.0; 10]; 10], |state| {
+        aco.routine_aco(20, &vec![[1.0; MAX_K]; 10], |state| {
             let mut cost = 6.0;
             for (i, &s) in state.iter().enumerate() {
                 if i % 2 == 0 {

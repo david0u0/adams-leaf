@@ -82,6 +82,16 @@ impl Flow {
             panic!("並非TT資料流卻想取 offset");
         }
     }
+    pub fn is_avb(&self) -> bool {
+        if let Flow::AVB { .. } = self {
+            true
+        } else {
+            false
+        }
+    }
+    pub fn is_tt(&self) -> bool {
+        !self.is_avb()
+    }
 }
 
 pub trait RoutingAlgo {
@@ -99,9 +109,6 @@ pub use shortest_path::SPF;
 mod routing_optimism;
 pub use routing_optimism::RO;
 
-mod aco;
-pub use aco::ACO;
-
 mod recorder;
 pub use recorder::{FlowTable, GCL};
 
@@ -109,6 +116,8 @@ mod cost_calculator;
 pub use cost_calculator::CostCalculator;
 
 pub mod time_and_tide;
+
+pub mod adams_ant;
 
 #[cfg(test)]
 mod test {

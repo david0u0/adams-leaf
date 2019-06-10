@@ -124,7 +124,7 @@ impl <T: Clone> FlowTable<T> {
             let flow = self.flow_list[index].as_ref().unwrap();
             let _info = info as *const T as *mut T;
             unsafe {
-                if let Flow::AVB { .. } = flow {
+                if flow.is_avb() {
                     if is_avb {
                         callback(flow, &mut *_info);
                     }

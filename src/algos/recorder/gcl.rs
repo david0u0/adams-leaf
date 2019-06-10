@@ -2,6 +2,31 @@ use std::collections::HashMap;
 
 use crate::MAX_QUEUE;
 
+fn gcd(a: u32, b: u32) -> u32 {
+    if a < b {
+        gcd(b, a)
+    } else if b == 0 {
+        a
+    } else {
+        gcd(b, a % b)
+    }
+}
+fn lcm(a: u32, b: u32) -> u32 {
+    let g = gcd(a, b);
+    (a / g) * b
+}
+
+#[cfg(test)]
+mod test {
+    use super::lcm;
+    #[test]
+    fn test_lcm() {
+        assert_eq!(36, lcm(4, 9));
+        assert_eq!(81, lcm(27, 81));
+        assert_eq!(84, lcm(12, 21));
+    }
+}
+
 pub struct GCL {
     hyper_p: u32,
     // TODO 這個資料結構有優化的空間
@@ -17,6 +42,9 @@ impl GCL {
             queue_map: HashMap::new(),
             hyper_p
         }
+    }
+    pub fn update_hyper_p(&mut self, new_p: u32) {
+        self.hyper_p = lcm(self.hyper_p, new_p);
     }
     pub fn clear(&mut self) {
         self.queue_map = HashMap::new();

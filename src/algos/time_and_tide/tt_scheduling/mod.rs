@@ -71,7 +71,7 @@ pub fn schedule_fixed_og<'a, T: Clone+'a, F: Fn(&'a Flow, &'a T) -> &'a Links>(
 ) -> Result<(), ()> {
     let mut tt_flows = Vec::<usize>::new();
     changed_table.foreach(false, |flow, _| {
-        if let Flow::TT { .. } = flow {
+        if flow.is_tt() {
             tt_flows.push(*flow.id());
         }
     });

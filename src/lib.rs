@@ -6,6 +6,7 @@ pub mod network_struct;
 pub mod algos;
 pub mod util;
 pub const MAX_QUEUE: u8 = 8;
+pub const MAX_K: usize = 20;
 
 use algos::{Flow, AVBType};
 

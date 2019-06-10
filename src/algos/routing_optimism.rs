@@ -31,7 +31,7 @@ pub struct RO<'a> {
 }
 
 impl <'a> RO<'a> {
-    pub fn new(g: &'a StreamAwareGraph, hyper_p: usize, gcl: GCL) -> Self {
+    pub fn new(g: &'a StreamAwareGraph, gcl: GCL) -> Self {
         RO {
             gcl,
             g: g.clone(),
@@ -163,7 +163,7 @@ impl <'a> RoutingAlgo for RO<'a> {
     fn compute_routes(&mut self, flows: Vec<Flow>) {
         for flow in flows.iter() {
             self.yens_algo.compute_routes(*flow.src(), *flow.dst());
-            if let Flow::AVB { .. } = &flow {
+            if flow.is_avb() {
                 self.avb_count += 1;
             } else {
                 self.tt_count += 1;

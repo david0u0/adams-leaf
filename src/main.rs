@@ -20,7 +20,7 @@ fn main() -> Result<(), String> {
     let mut gcl = GCL::new(100, g.get_edge_cnt());
     gcl.insert_gate_evt(9, 0, 0, 100); // 4 -> 2
 
-    let mut algo = RO::new(&g, 100, gcl);
+    let mut algo = RO::new(&g, gcl);
 
     algo.compute_routes(flows.clone());
     println!("{:?}", algo.get_route(0));
