@@ -74,7 +74,7 @@ impl <'a, K: Hash+Eq+Copy, G: Graph<K>> Dijkstra<'a, K, G> {
 #[cfg(test)]
 mod test {
     use crate::network_struct::Graph;
-    use crate::algos::StreamAwareGraph;
+    use crate::routing_algos::StreamAwareGraph;
     use super::Dijkstra;
     #[test]
     fn test_dijkstra1() -> Result<(), String> {

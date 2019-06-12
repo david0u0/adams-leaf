@@ -1,5 +1,5 @@
 use adams_leaf::network_struct::Graph;
-use adams_leaf::algos::{RO, GCL, RoutingAlgo, StreamAwareGraph};
+use adams_leaf::routing_algos::{RO, GCL, RoutingAlgo, StreamAwareGraph};
 use adams_leaf::read_flows_from_file;
 
 

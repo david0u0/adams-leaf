@@ -20,8 +20,8 @@ use std::cmp::Ordering;
 /// * `deadline` - 時間較緊的要排前面
 /// * `period` - 週期短的要排前面
 /// * `route length` - 路徑長的要排前面
-fn cmp_flow<'a, T: Clone, F: Fn(&'a Flow, &'a T) -> &'a Links> (
-    id1: usize, id2: usize, table: &'a FT<T>, get_links: F
+fn cmp_flow<T: Clone, F: Fn(&Flow, &T) -> Links> (
+    id1: usize, id2: usize, table: &FT<T>, get_links: F
 ) -> Ordering {
     let flow1 = table.get_flow(id1);
     let flow2 = table.get_flow(id2);
@@ -52,22 +52,24 @@ fn cmp_flow<'a, T: Clone, F: Fn(&'a Flow, &'a T) -> &'a Links> (
 /// * `og_table` - 本來的資料流表
 /// * `changed_table` - 被改動到的那部份資料流，包含新增與換路徑
 /// * `gcl` - 本來的 Gate Control List
-pub fn schedule_online<'a, T: Clone+'a, F: Fn(&'a Flow, &'a T) -> &'a Links>(
-    og_table: &'a FT<T>, changed_table: &'a FT<T>,
+pub fn schedule_online<T: Clone, F: Fn(&Flow, &T) -> Links>(
+    og_table: &mut FT<T>, changed_table: &FT<T>,
     gcl: &mut GCL, get_links: F
 ) -> Result<(), ()> {
     let result = schedule_fixed_og(changed_table, gcl, |f, t| get_links(f, t));
     if !result.is_ok() {
         gcl.clear();
-        let union_table = og_table.union(true, &changed_table);
-        //schedule_fixed_og(&union_table, gcl, |f, t| get_links(f, t))?;
+        og_table.union(true, &changed_table);
+        schedule_fixed_og(og_table, gcl, |f: &Flow, t: &T| {
+            get_links(f, t)
+        })?;
     }
     Ok(())
 }
 
 /// 也可以當作離線排程算法來使用
-pub fn schedule_fixed_og<'a, T: Clone+'a, F: Fn(&'a Flow, &'a T) -> &'a Links>(
-    changed_table: &'a FT<T>, gcl: &mut GCL, get_links: F
+pub fn schedule_fixed_og<T: Clone, F: Fn(&Flow, &T) -> Links>(
+    changed_table: &FT<T>, gcl: &mut GCL, get_links: F
 ) -> Result<(), ()> {
     let mut tt_flows = Vec::<usize>::new();
     changed_table.foreach(false, |flow, _| {

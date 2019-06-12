@@ -69,7 +69,7 @@ fn test_online_schedule() {
     let mut gcl = GCL::new(600, 16);
     let ft = gen_flow_table();
 
-    schedule_fixed_og(&ft, &mut gcl, |_, info| info);
+    schedule_fixed_og(&ft, &mut gcl, |_, info| info.clone());
     //schedule_online(&ft, &ft, &mut gcl, |_, info| info);
     let ans = vec![(0, 1, 0), (1, 1, 0), (2, 1, 0), (3, 1, 0),
         (4, 1, 0), (150, 1, 0), (151, 1, 0), (152, 1, 0), (203, 1, 0),

@@ -3,12 +3,12 @@ extern crate serde_json;
 use serde::{Serialize, Deserialize};
 
 pub mod network_struct;
-pub mod algos;
+pub mod routing_algos;
 pub mod util;
 pub const MAX_QUEUE: u8 = 8;
 pub const MAX_K: usize = 20;
 
-use algos::{Flow, AVBType};
+use routing_algos::{Flow, AVBType};
 
 pub fn read_flows_from_file(base_id: usize, file_name: &str) -> Vec<Flow> {
     let mut flows = vec![];

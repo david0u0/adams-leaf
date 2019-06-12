@@ -21,18 +21,28 @@ pub enum ACOArgsUSize {
 type State = Vec<usize>;
 
 #[derive(PartialOrd)]
-struct WeightedState(f64, State);
+struct WeightedState {
+    neg_dist: f64, state: Option<State>
+}
+impl WeightedState {
+    fn new(dist: f64, state: Option<State>) -> Self {
+        WeightedState { neg_dist: -dist, state }
+    }
+    fn get_dist(&self) -> f64 {
+        -self.neg_dist
+    }
+}
 impl PartialEq for WeightedState {
     fn eq(&self, other: &Self) -> bool {
-        return self.0 == other.0;
+        return self.neg_dist == other.neg_dist;
     }
 }
 impl Eq for WeightedState { }
 impl Ord for WeightedState {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        if self.0 > other.0 {
+        if self.neg_dist > other.neg_dist {
             std::cmp::Ordering::Greater
-        } else if self.0 < other.0 {
+        } else if self.neg_dist < other.neg_dist {
             std::cmp::Ordering::Less
         } else {
             std::cmp::Ordering::Equal
@@ -68,20 +78,20 @@ fn select_cluster(visibility: &[f64; MAX_K], pheromone: &[f64; MAX_K], k: usize,
 }
 
 pub struct ACO {
+    state_cnt: usize,
     pheromone: Vec<[f64; MAX_K]>,
-    state: State,
     k: usize,
-    tao0: f64,
     r: usize,
     l: usize,
     rho: f64,
+    tao0: f64,
     q0: f64,
     max_ph: f64,
     min_ph: f64
 }
 
 impl ACO {
-    pub fn new(state: Vec<usize>, k: usize, tao0: Option<f64>) -> Self {
+    pub fn new(state_cnt: usize, k: usize, tao0: Option<f64>) -> Self {
         assert!(k <= MAX_K, "K值必需在{}以下", MAX_K);
         let tao0 = {
             if let Some(t) = tao0 {
@@ -91,8 +101,8 @@ impl ACO {
             }
         };
         ACO {
-            pheromone: state.iter().map(|_| [tao0; MAX_K]).collect(),
-            state, tao0, k,
+            pheromone: (0..state_cnt).map(|_| [tao0; MAX_K]).collect(),
+            state_cnt, tao0, k,
             r: R,
             l: L,
             rho: RHO,
@@ -101,52 +111,48 @@ impl ACO {
             min_ph: MIN_PH
         }
     }
-    pub fn get_state(&self) -> &State {
-        &self.state
-    }
     pub fn get_pharamon(&self) -> &Vec<[f64; MAX_K]> {
         return &self.pheromone;
     }
-    pub fn routine_aco<F>(&mut self, epoch: usize,
-        visibility: &Vec<[f64; MAX_K]>, mut cost_estimate: F
-    ) where F: FnMut(&State) -> f64 {
-        let mut min_cost = std::f64::MAX;
-        let mut best_state: State = vec![];
-        for _ in 0..epoch {
-            let (local_best_state, local_min_cost)
-                = self.do_single_colony(&visibility, &mut cost_estimate);
-            if local_min_cost < min_cost {
-                min_cost = local_min_cost;
+    pub fn routine_aco<F>(&mut self, time_limit: u128,
+        visibility: &Vec<[f64; MAX_K]>,
+        mut calculate_dist: F, cur_dist: f64
+    ) -> Option<State> where F: FnMut(&State) -> f64 {
+        let time = std::time::Instant::now();
+        let mut best_state = WeightedState::new(cur_dist, None);
+        while time.elapsed().as_micros() < time_limit {
+            let local_best_state = self.do_single_epoch(&visibility, &mut calculate_dist);
+            if local_best_state.get_dist() < best_state.get_dist() {
                 best_state = local_best_state;
             }
         }
-        self.state = best_state;
+        best_state.state
     }
-    fn do_single_colony<F>(&mut self, visibility: &Vec<[f64; MAX_K]>,
-        cost_estimate: &mut F) -> (State, f64)
+    fn do_single_epoch<F>(&mut self, visibility: &Vec<[f64; MAX_K]>,
+        calculate_dist: &mut F) -> WeightedState
     where F: FnMut(&State) -> f64 {
         let mut max_heap: BinaryHeap<WeightedState> = BinaryHeap::new();
         for _ in 0..self.r {
-            let mut cur_state = self.state.clone();
-            for i in 0..self.state.len() {
+            let mut cur_state = Vec::<usize>::with_capacity(self.state_cnt);
+            for i in 0..self.state_cnt {
                 let next = select_cluster(&visibility[i], &self.pheromone[i], self.k, self.q0);
-                cur_state[i] = next;
-                // online pharamon update
+                cur_state.push(next);
+                // TODO online pharamon update
             }
-            let cost = (cost_estimate)(&cur_state);
-            max_heap.push(WeightedState(-cost, cur_state));
+            let dist = calculate_dist(&cur_state);
+            max_heap.push(WeightedState::new(dist, Some(cur_state)));
         }
         // offline update
-        let best_state = max_heap.pop().unwrap();
         self.evaporate();
+        let best_state = max_heap.pop().unwrap();
         self.update_pheromon(&best_state);
         for _ in 0..self.l-1 {
             self.update_pheromon(&max_heap.pop().unwrap());
         }
-        (best_state.1, -best_state.0)
+        best_state
     }
     fn evaporate(&mut self) {
-        for i in 0..self.state.len() {
+        for i in 0..self.state_cnt {
             for j in 0..self.k {
                 let ph = (1.0 - self.rho) * self.pheromone[i][j];
                 self.pheromone[i][j] = ph;
@@ -154,11 +160,12 @@ impl ACO {
         }
     }
     fn update_pheromon(&mut self, w_state: &WeightedState) {
-        for i in 0..w_state.1.len() {
+        let dist = w_state.get_dist();
+        for i in 0..self.state_cnt {
             for j in 0..self.k {
                 let mut ph = self.pheromone[i][j];
-                if w_state.1[i] == j {
-                    ph += 1.0 / (-w_state.0);
+                if w_state.state.as_ref().unwrap()[i] == j {
+                    ph += 1.0 / dist;
                 }
                 if ph > self.max_ph {
                     ph = self.max_ph;
@@ -184,40 +191,15 @@ impl ACO {
             ACOArgsUSize::R => self.r = arg,
         }
     }
-    /// 根據一組鍵值重新排列所有狀態，鍵值亦會被重新排列
-    /// * `state_key` - 所有狀態將會依照此鍵值表重新排列
-    /// * `cmp` - 一個函式。若 cmp(a, b) = true，則 a 會排在 b 前面。
-    pub fn reorder<T: Clone, F: Fn(&T, &T) -> bool>(&mut self, state_key: &mut Vec<T>, cmp: F) {
-        assert_eq!(state_key.len(), self.state.len());
-        let mut tmp_vec = state_key.iter().enumerate().map(|(i, sv)| {
-            (i, sv)
-        }).collect::<Vec<_>>();
-        tmp_vec.sort_by(|a, b| {
-            if cmp(&a.1, &b.1) {
-                return std::cmp::Ordering::Less;
-            } else {
-                return std::cmp::Ordering::Greater;
-            }
-        });
-        let mut tmp_state = Vec::<usize>::with_capacity(tmp_vec.len());
-        let mut tmp_ph = Vec::<[f64; MAX_K]>::with_capacity(tmp_vec.len());
-        for i in 0..tmp_vec.len() {
-            tmp_state.push(self.state[tmp_vec[i].0]);
-            tmp_ph.push(self.pheromone[tmp_vec[i].0]);
-        }
-        self.state = tmp_state;
-        self.pheromone = tmp_ph;
-        *state_key = tmp_vec.into_iter().map(|(_, s)| s.clone()).collect();
-    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
     #[test]
-    fn test_ant_aco1() {
-        let mut aco = ACO::new(vec![0; 10], 2, None);
-        aco.routine_aco(20, &vec![[1.0; MAX_K]; 10], |state| {
+    fn test_ant_aco() {
+        let mut aco = ACO::new(10, 2, None);
+        let new_state = aco.routine_aco(50000, &vec![[1.0; MAX_K]; 10], |state| {
             let mut cost = 6.0;
             for (i, &s) in state.iter().enumerate() {
                 if i % 2 == 0 {
@@ -227,15 +209,7 @@ mod test {
                 }
             }
             cost / 6.0
-        });
-        assert_eq!(vec![0, 1, 0, 1, 0, 1, 0, 1, 0, 1], *aco.get_state());
-    }
-    #[test]
-    fn test_ant_reorder() {
-        let mut aco = ACO::new(vec![5, 6, 7, 8, 9], 10, None);
-        let mut state_key = vec![0, 1, 2, 4, 3];
-        aco.reorder(&mut state_key, |a, b| a > b);
-        assert_eq!(vec![4, 3, 2, 1, 0], state_key);
-        assert_eq!(vec![8, 9, 7, 6, 5], *aco.get_state());
+        }, std::f64::MAX).unwrap();
+        assert_eq!(vec![0, 1, 0, 1, 0, 1, 0, 1, 0, 1], new_state);
     }
 }

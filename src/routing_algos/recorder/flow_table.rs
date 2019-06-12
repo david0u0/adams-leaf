@@ -41,6 +41,9 @@ impl <T: Clone> FlowTable<T> {
             flow_list: self.flow_list.clone()
         }
     }
+    pub fn check_flow_exist(&self, id: usize) -> bool {
+        self.infos[id].is_some()
+    }
     pub fn get_flow(&self, id: usize) -> &Flow {
         if let Some(t) = &self.flow_list[id] {
             return t;
@@ -54,12 +57,12 @@ impl <T: Clone> FlowTable<T> {
         panic!("該資料流不存在");
     }
     pub fn delete_flow(&mut self, id: usize) {
-        /* if let Some(_) = &self.infos[id] {
-            //self.flow_list[id] = None;
+        if let Some(_) = &self.infos[id] {
+            // self.flow_list[id] = None;
+            self.infos[id] = None;
         } else {
             panic!("該資料流不存在");
-        } */
-        unimplemented!();
+        }
     }
     pub fn insert(&mut self, flows: Vec<Flow>, info: T) {
         let list = self.flow_list.clone();
@@ -134,16 +137,14 @@ impl <T: Clone> FlowTable<T> {
             }
         }
     }
-    pub fn union(&self, is_avb: bool, other: &FlowTable<T>) -> Self {
+    pub fn union(&mut self, is_avb: bool, other: &FlowTable<T>) {
         if !self.is_same_flow_list(other) {
             panic!("試圖合併不相干的 FlowTable");
         }
-        let mut new = self.clone();
         other.foreach(is_avb, |flow, info| {
             let id = *flow.id();
-            new.update_info(id, info.clone());
+            self.update_info(id, info.clone());
         });
-        new
     }
     pub fn is_same_flow_list(&self, other: &FlowTable<T>) -> bool {
         let a = &*self.flow_list as *const Vec<Option<Flow>>;
@@ -192,9 +193,9 @@ mod test {
         assert_eq!(*table.get_info(2), 0);
 
         let merged = table.union(true, &changed);
-        assert_eq!(*merged.get_info(2), 99);
-        assert_eq!(*merged.get_info(4), 77);
-        assert_eq!(count_flows_inside(&merged), 5);
+        assert_eq!(*table.get_info(2), 99);
+        assert_eq!(*table.get_info(4), 77);
+        assert_eq!(count_flows_inside(&table), 5);
     }
     #[test]
     #[should_panic]

@@ -258,7 +258,7 @@ impl StreamAwareGraph {
         }
         ret
     }
-    pub fn get_edges_id_bandwidth(&self, route: &Vec<usize>) -> Vec<(usize, f64)> {
+    pub fn get_links_id_bandwidth(&self, route: &Vec<usize>) -> Vec<(usize, f64)> {
         let mut vec = vec![];
         for i in 0..route.len()-1 {
             if let Some((edge_id, _, bandwidth)) = self.edge_info.get(&(route[i], route[i+1])) {

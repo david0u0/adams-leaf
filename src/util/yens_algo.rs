@@ -139,7 +139,7 @@ impl <'a, K: Hash+Eq+Copy+Debug , G: OnOffGraph<K>> YensAlgo<'a, K, G> {
 #[cfg(test)]
 mod test {
     use crate::network_struct::Graph;
-    use crate::algos::StreamAwareGraph;
+    use crate::routing_algos::StreamAwareGraph;
     use super::YensAlgo;
     #[test]
     #[ignore] // 用 cargo test -- --ignored 才可以測試
