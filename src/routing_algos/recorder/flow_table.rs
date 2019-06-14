@@ -177,7 +177,7 @@ mod test {
         let mut table = FlowTable::<usize>::new();
         let flows = read_flows_from_file(0, "flows.json");
         table.insert(flows, 0);
-        assert_eq!(count_flows_inside(&table), 5);
+        assert_eq!(count_flows_inside(&table), 6);
 
         let mut changed = table.clone_into_changed_table();
         assert_eq!(count_flows_inside(&changed), 0);
@@ -192,10 +192,10 @@ mod test {
         assert_eq!(*changed.get_info(4), 77);
         assert_eq!(*table.get_info(2), 0);
 
-        let merged = table.union(true, &changed);
+        table.union(true, &changed);
         assert_eq!(*table.get_info(2), 99);
         assert_eq!(*table.get_info(4), 77);
-        assert_eq!(count_flows_inside(&table), 5);
+        assert_eq!(count_flows_inside(&table), 6);
     }
     #[test]
     #[should_panic]

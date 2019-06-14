@@ -111,9 +111,11 @@ impl ACO {
         }
     }
     pub fn extend_state_len(&mut self, new_len: usize) {
-        let diff_len = new_len - self.pheromone.len();
-        let tao0 = self.tao0;
-        self.pheromone.extend((0..diff_len).map(|_| [tao0; MAX_K]));
+        if new_len > self.pheromone.len() {
+            let diff_len = new_len - self.pheromone.len();
+            let tao0 = self.tao0;
+            self.pheromone.extend((0..diff_len).map(|_| [tao0; MAX_K]));
+        }
     }
     pub fn get_pharamon(&self) -> &Vec<[f64; MAX_K]> {
         return &self.pheromone;
