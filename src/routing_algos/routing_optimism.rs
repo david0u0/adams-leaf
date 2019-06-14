@@ -6,8 +6,8 @@ use super::time_and_tide::compute_avb_latency;
 
 const K: usize = 20;
 const ALPHA_PORTION: f64 = 0.5;
-const T_LIMIT: u128 = 1000 * 10; // micro_sec
-const C1_EXCEED: f64 = 1000.0;
+const T_LIMIT: u128 = 1000 * 100; // micro_sec
+const C1_EXCEED: f64 = 100.0;
 const W1: f64 = 1.0;
 const W2: f64 = 1.0;
 const W3: f64 = 1.0;
@@ -41,9 +41,15 @@ impl <'a> RO<'a> {
             tt_count: 0,
         }
     }
-    pub fn compute_avb_cost(&self, flow: &Flow) -> f64 {
+    pub fn compute_avb_cost(&self, flow: &Flow, k: Option<usize>) -> f64 {
         let max_delay = *flow.max_delay();
-        let route = self.get_kth_route(flow, *self.flow_table.get_info(*flow.id()));
+        let k = {
+            match k {
+                Some(t) => t,
+                None => *self.flow_table.get_info(*flow.id())
+            }
+        };
+        let route = self.get_kth_route(flow, k);
         let latency = compute_avb_latency(
             &self.g,
             flow,
@@ -63,7 +69,7 @@ impl <'a> RO<'a> {
     pub fn compute_all_avb_cost(&self) -> f64 {
         let mut cost = 0.0;
         self.flow_table.foreach(true, |flow, _| {
-            cost += self.compute_avb_cost(flow);
+            cost += self.compute_avb_cost(flow, None);
         });
         cost
     }
@@ -81,21 +87,12 @@ impl <'a> RO<'a> {
                 // NOTE 從圖中把舊的資料流全部忘掉
                 (*_g).forget_all_flows();
             }
-            self.flow_table.foreach_mut(true, |flow, route| {
-                let mut min_cost = std::f64::MAX;
-                let mut best_r = 0;
-                let k = self.get_candidate_count(flow);
-                let alpha = (k as f64 * ALPHA_PORTION) as usize;
-                for r in gen_n_distinct_outof_k(alpha, k).into_iter() {
-                    *route = r;
-                    let cost = self.compute_avb_cost(flow);
-                    if cost < min_cost {
-                        min_cost = cost;
-                        best_r = r;
-                    }
-                }
-                *route = best_r;
-                let route = self.get_kth_route(flow, best_r);
+            self.flow_table.foreach_mut(true, |flow, route_k| {
+                let candidate_cnt = self.get_candidate_count(flow);
+                let alpha = (candidate_cnt as f64 * ALPHA_PORTION) as usize;
+                let set = Some(gen_n_distinct_outof_k(alpha, candidate_cnt));
+                *route_k = self.find_min_cost_route(flow, set);
+                let route = self.get_kth_route(flow, *route_k);
                 unsafe {
                     // NOTE 把資料流的路徑與ID記憶到圖中
                     (*_g).save_flowid_on_edge(true, *flow.id(), route);
@@ -108,34 +105,53 @@ impl <'a> RO<'a> {
                 min_cost = cost;
                 println!("found min_cost = {} at first glance!", cost);
             }
+            println!("start iteration #{}", iter_times);
             min_cost = self.hill_climbing(&time, min_cost, &mut best_all_routing);
         }
-        println!("# of iteration = {}", iter_times);
         self.flow_table = best_all_routing;
+    }
+    fn find_min_cost_route(&self, flow: &Flow, set: Option<Vec<usize>>) -> usize {
+        let (mut min_cost, mut best_k) = (std::f64::MAX, 0);
+        let mut closure = |k: usize| {
+            let cost = self.compute_avb_cost(flow, Some(k));
+            if cost < min_cost {
+                min_cost = cost;
+                best_k = k;
+            }
+        };
+        if let Some(vec) = set {
+            for k in vec.into_iter() {
+                closure(k);
+            }
+        } else {
+            for k in 0..self.get_candidate_count(flow) {
+                closure(k);
+            }
+        }
+        best_k
     }
     fn hill_climbing(&mut self, time: &std::time::Instant,
         mut min_cost: f64, best_all_routing: &mut FlowTable<usize>
     ) -> f64 {
         let mut iter_times = 0;
-        let _g = &mut self.g as *mut StreamAwareGraph;
         while time.elapsed().as_micros() < T_LIMIT {
-            let target_id = rand::thread_rng().gen_range(0, self.avb_count);
+            let target_id = rand::thread_rng().gen_range(0, self.avb_count + self.tt_count);
             let target_flow = self.flow_table.get_flow(target_id);
-            let r = self.get_candidate_count(&target_flow);
-            let new_route = rand::thread_rng().gen_range(0, r);
-            let old_route = *self.flow_table.get_info(target_id);
-            if old_route == new_route {
+            if target_flow.is_tt() { // TODO 用更好的機制篩選 avb flow
                 continue;
-            } else {
-                // NOTE 從圖中忘記舊路徑，記憶新路徑
-                let old_route = self.get_kth_route(target_flow, old_route);
-                let new_route = self.get_kth_route(target_flow, new_route);
-                unsafe {
-                    (*_g).save_flowid_on_edge(false, target_id, old_route);
-                    (*_g).save_flowid_on_edge(true, target_id, new_route);
-                }
             }
+            let old_route = *self.flow_table.get_info(target_id);
+            // 從圖中忘記舊路徑
+            unsafe { self.save_flowid_on_edge(false, target_flow, old_route); }
+            let new_route = self.find_min_cost_route(target_flow, None);
+            unsafe {
+                self.save_flowid_on_edge(true, target_flow, new_route);
+            }
+            /*if old_route == new_route {
+                continue;
+            }*/
             self.flow_table.update_info(target_id, new_route);
+
             let cost = self.compute_all_avb_cost();
             if cost < min_cost {
                 *best_all_routing = self.flow_table.clone();
@@ -143,6 +159,7 @@ impl <'a> RO<'a> {
                 iter_times = 0;
                 println!("found min_cost = {}", cost);
             } else {
+                // TODO 回復上一動……？
                 iter_times += 1;
                 //println!("Nothing found QQ");
                 if iter_times == self.avb_count {
@@ -157,6 +174,11 @@ impl <'a> RO<'a> {
     }
     fn get_candidate_count(&self, flow: &Flow) -> usize {
         self.yens_algo.get_route_count(*flow.src(), *flow.dst())
+    }
+    unsafe fn save_flowid_on_edge(&self, remember: bool, flow: &Flow, k: usize) {
+        let _g = &self.g as *const StreamAwareGraph as *mut StreamAwareGraph;
+        let route = self.get_kth_route(flow, k);
+        (*_g).save_flowid_on_edge(remember, *flow.id(), route);
     }
 }
 impl <'a> RoutingAlgo for RO<'a> {
