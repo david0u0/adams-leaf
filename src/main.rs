@@ -32,6 +32,8 @@ fn main() -> Result<(), String> {
     println!("{}", algo.compute_avb_cost(&flows[3], None));
     println!("{:?}", algo.get_route(4));
     println!("{}", algo.compute_avb_cost(&flows[4], None));
+    println!("{:?}", algo.get_route(5));
+    println!("{}", algo.compute_avb_cost(&flows[5], None));
 
     println!("sum = {}", algo.compute_all_avb_cost());
 

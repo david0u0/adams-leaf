@@ -101,7 +101,7 @@ impl <'a> RO<'a> {
                 min_cost = cost;
                 println!("found min_cost = {} at first glance!", cost);
             }
-            println!("start iteration #{}", iter_times);
+            // println!("start iteration #{}", iter_times);
             min_cost = self.hill_climbing(&time, min_cost, &mut best_all_routing);
         }
         self.flow_table = best_all_routing;
@@ -140,24 +140,31 @@ impl <'a> RO<'a> {
             // 從圖中忘記舊路徑
             unsafe { self.save_flowid_on_edge(false, target_flow, old_route); }
             let new_route = self.find_min_cost_route(target_flow, None);
-            unsafe {
-                self.save_flowid_on_edge(true, target_flow, new_route);
-            }
-            /*if old_route == new_route {
-                continue;
-            }*/
-            self.flow_table.update_info(target_id, new_route);
-
-            let cost = self.compute_all_avb_cost();
+            let cost = if old_route == new_route {
+                std::f64::MAX
+            } else {
+                // 在圖中記憶新路徑
+                let _s = self as *const Self as *mut Self;
+                unsafe {
+                    self.save_flowid_on_edge(true, target_flow, new_route);
+                    (*_s).flow_table.update_info(target_id, new_route);
+                }
+                self.compute_all_avb_cost()
+            };
             if cost < min_cost {
                 *best_all_routing = self.flow_table.clone();
+                self.flow_table.update_info(target_id, new_route);
+
                 min_cost = cost;
                 iter_times = 0;
                 println!("found min_cost = {}", cost);
             } else {
-                // TODO 回復上一動……？
+                // 恢復上一動
+                unsafe { self.save_flowid_on_edge(false, target_flow, new_route); }
+                unsafe { self.save_flowid_on_edge(true, target_flow, old_route); }
+                self.flow_table.update_info(target_id, old_route);
+                
                 iter_times += 1;
-                //println!("Nothing found QQ");
                 if iter_times == self.avb_count {
                     break;
                 }

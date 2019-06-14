@@ -49,7 +49,7 @@ fn cmp_flow<T: Clone, F: Fn(&Flow, &T) -> Links> (
 }
 
 /// 動態計算 TT 資料流的 Gate Control List
-/// * `og_table` - 本來的資料流表
+/// * `og_table` - 本來的資料流表（排程之後，TT部份會與 changed_table 合併）
 /// * `changed_table` - 被改動到的那部份資料流，包含新增與換路徑
 /// * `gcl` - 本來的 Gate Control List
 pub fn schedule_online<T: Clone, F: Fn(&Flow, &T) -> Links>(
@@ -57,9 +57,9 @@ pub fn schedule_online<T: Clone, F: Fn(&Flow, &T) -> Links>(
     gcl: &mut GCL, get_links: F
 ) -> Result<(), ()> {
     let result = schedule_fixed_og(changed_table, gcl, |f, t| get_links(f, t));
+    og_table.union(false, &changed_table);
     if !result.is_ok() {
         gcl.clear();
-        og_table.union(true, &changed_table);
         schedule_fixed_og(og_table, gcl, |f: &Flow, t: &T| {
             get_links(f, t)
         })?;
