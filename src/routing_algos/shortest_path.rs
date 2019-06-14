@@ -18,7 +18,7 @@ impl <'a> SPF<'a> {
 }
 
 impl <'a> RoutingAlgo for SPF<'a> {
-    fn compute_routes(&mut self, flows: Vec<Flow>) {
+    fn add_flows(&mut self, flows: Vec<Flow>) {
         for flow in flows.into_iter() {
             if let Flow::AVB { src, dst, .. } = flow {
                 let r = self.dijkstra_algo.get_route(src, dst);
@@ -28,6 +28,9 @@ impl <'a> RoutingAlgo for SPF<'a> {
                 self.flow_table.insert(vec![flow], r.unwrap().1);
             }
         }
+    }
+    fn del_flows(&mut self, flows: Vec<Flow>) {
+        unimplemented!();
     }
     fn get_retouted_flows(&self) -> &Vec<usize> {
         return &self.rerouted;

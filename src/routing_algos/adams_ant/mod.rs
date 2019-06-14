@@ -50,12 +50,15 @@ impl <'a> AdamsAnt<'a> {
     }
     fn do_aco(&self, time: Instant) {
         let cur_cost = compute_all_avb_cost(self);
+        // self.aco
     }
 }
 
 impl <'a> RoutingAlgo for AdamsAnt<'a> {
-    fn compute_routes(&mut self, flows: Vec<Flow>) {
+    fn add_flows(&mut self, flows: Vec<Flow>) {
+        let mut max_id = 0;
         for flow in flows.iter() {
+            max_id = std::cmp::max(max_id, *flow.id());
             self.yens_algo.compute_routes(*flow.src(), *flow.dst());
             if flow.is_avb() {
                 self.avb_count += 1;
@@ -77,6 +80,9 @@ impl <'a> RoutingAlgo for AdamsAnt<'a> {
             let r = self.get_kth_route(&flow, *k);
             unsafe { (*g).save_flowid_on_edge(true, *flow.id(), r) }
         });
+    }
+    fn del_flows(&mut self, flows: Vec<Flow>) {
+        unimplemented!();
     }
     fn get_retouted_flows(&self) -> &Vec<usize> {
         unimplemented!();

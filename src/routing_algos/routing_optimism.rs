@@ -160,7 +160,7 @@ impl <'a> RO<'a> {
     }
 }
 impl <'a> RoutingAlgo for RO<'a> {
-    fn compute_routes(&mut self, flows: Vec<Flow>) {
+    fn add_flows(&mut self, flows: Vec<Flow>) {
         for flow in flows.iter() {
             self.yens_algo.compute_routes(*flow.src(), *flow.dst());
             if flow.is_avb() {
@@ -177,6 +177,9 @@ impl <'a> RoutingAlgo for RO<'a> {
             let r = self.get_kth_route(&flow, *k);
             unsafe { (*g).save_flowid_on_edge(true, *flow.id(), r) }
         });
+    }
+    fn del_flows(&mut self, flows: Vec<Flow>) {
+        unimplemented!();
     }
     fn get_retouted_flows(&self) -> &Vec<usize> {
         unimplemented!();

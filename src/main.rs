@@ -22,7 +22,7 @@ fn main() -> Result<(), String> {
 
     let mut algo = RO::new(&g, gcl);
 
-    algo.compute_routes(flows.clone());
+    algo.add_flows(flows.clone());
     println!("{:?}", algo.get_route(0));
     println!("{:?}", algo.get_route(1));
     println!("{}", algo.compute_avb_cost(&flows[1]));

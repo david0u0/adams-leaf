@@ -78,7 +78,6 @@ fn select_cluster(visibility: &[f64; MAX_K], pheromone: &[f64; MAX_K], k: usize,
 }
 
 pub struct ACO {
-    state_cnt: usize,
     pheromone: Vec<[f64; MAX_K]>,
     k: usize,
     r: usize,
@@ -91,7 +90,7 @@ pub struct ACO {
 }
 
 impl ACO {
-    pub fn new(state_cnt: usize, k: usize, tao0: Option<f64>) -> Self {
+    pub fn new(state_len: usize, k: usize, tao0: Option<f64>) -> Self {
         assert!(k <= MAX_K, "K值必需在{}以下", MAX_K);
         let tao0 = {
             if let Some(t) = tao0 {
@@ -101,8 +100,8 @@ impl ACO {
             }
         };
         ACO {
-            pheromone: (0..state_cnt).map(|_| [tao0; MAX_K]).collect(),
-            state_cnt, tao0, k,
+            pheromone: (0..state_len).map(|_| [tao0; MAX_K]).collect(),
+            tao0, k,
             r: R,
             l: L,
             rho: RHO,
@@ -111,10 +110,15 @@ impl ACO {
             min_ph: MIN_PH
         }
     }
+    pub fn extend_state_len(&mut self, new_len: usize) {
+        let diff_len = new_len - self.pheromone.len();
+        let tao0 = self.tao0;
+        self.pheromone.extend((0..diff_len).map(|_| [tao0; MAX_K]));
+    }
     pub fn get_pharamon(&self) -> &Vec<[f64; MAX_K]> {
         return &self.pheromone;
     }
-    pub fn routine_aco<F>(&mut self, time_limit: u128,
+    pub fn do_aco<F>(&mut self, time_limit: u128,
         visibility: &Vec<[f64; MAX_K]>,
         mut calculate_dist: F, cur_dist: f64
     ) -> Option<State> where F: FnMut(&State) -> f64 {
@@ -132,9 +136,10 @@ impl ACO {
         calculate_dist: &mut F) -> WeightedState
     where F: FnMut(&State) -> f64 {
         let mut max_heap: BinaryHeap<WeightedState> = BinaryHeap::new();
+        let state_len = self.pheromone.len();
         for _ in 0..self.r {
-            let mut cur_state = Vec::<usize>::with_capacity(self.state_cnt);
-            for i in 0..self.state_cnt {
+            let mut cur_state = Vec::<usize>::with_capacity(state_len);
+            for i in 0..state_len {
                 let next = select_cluster(&visibility[i], &self.pheromone[i], self.k, self.q0);
                 cur_state.push(next);
                 // TODO online pharamon update
@@ -152,7 +157,8 @@ impl ACO {
         best_state
     }
     fn evaporate(&mut self) {
-        for i in 0..self.state_cnt {
+        let state_len = self.pheromone.len();
+        for i in 0..state_len {
             for j in 0..self.k {
                 let ph = (1.0 - self.rho) * self.pheromone[i][j];
                 self.pheromone[i][j] = ph;
@@ -161,7 +167,8 @@ impl ACO {
     }
     fn update_pheromon(&mut self, w_state: &WeightedState) {
         let dist = w_state.get_dist();
-        for i in 0..self.state_cnt {
+        let state_len = self.pheromone.len();
+        for i in 0..state_len {
             for j in 0..self.k {
                 let mut ph = self.pheromone[i][j];
                 if w_state.state.as_ref().unwrap()[i] == j {
@@ -198,8 +205,9 @@ mod test {
     use super::*;
     #[test]
     fn test_ant_aco() {
-        let mut aco = ACO::new(10, 2, None);
-        let new_state = aco.routine_aco(50000, &vec![[1.0; MAX_K]; 10], |state| {
+        let mut aco = ACO::new(0, 2, None);
+        aco.extend_state_len(10);
+        let new_state = aco.do_aco(50000, &vec![[1.0; MAX_K]; 10], |state| {
             let mut cost = 6.0;
             for (i, &s) in state.iter().enumerate() {
                 if i % 2 == 0 {
