@@ -75,7 +75,6 @@ impl <'a> RO<'a> {
     }
     /// 在所有 TT 都被排定的狀況下去執行 GRASP 優化
     fn grasp(&mut self) {
-        let _g = &mut self.g as *mut StreamAwareGraph;
         let time = std::time::Instant::now();
         let mut iter_times = 0;
         let mut min_cost = std::f64::MAX;
@@ -83,19 +82,16 @@ impl <'a> RO<'a> {
         while time.elapsed().as_micros() < T_LIMIT {
             iter_times += 1;
             // PHASE 1
-            unsafe {
-                // NOTE 從圖中把舊的資料流全部忘掉
-                (*_g).forget_all_flows();
-            }
+            // NOTE 先從圖中把舊的資料流全部忘掉
+            self.g.forget_all_flows();
             self.flow_table.foreach_mut(true, |flow, route_k| {
                 let candidate_cnt = self.get_candidate_count(flow);
                 let alpha = (candidate_cnt as f64 * ALPHA_PORTION) as usize;
                 let set = Some(gen_n_distinct_outof_k(alpha, candidate_cnt));
                 *route_k = self.find_min_cost_route(flow, set);
-                let route = self.get_kth_route(flow, *route_k);
                 unsafe {
                     // NOTE 把資料流的路徑與ID記憶到圖中
-                    (*_g).save_flowid_on_edge(true, *flow.id(), route);
+                    self.save_flowid_on_edge(true, flow, *route_k);
                 }
             });
             // PHASE 2
@@ -193,11 +189,9 @@ impl <'a> RoutingAlgo for RO<'a> {
         }
         self.flow_table.insert(flows, 0);
         self.grasp();
-        let g = &mut self.g as *mut StreamAwareGraph;
         self.g.forget_all_flows();
-        self.flow_table.foreach(true, |flow, k| {
-            let r = self.get_kth_route(&flow, *k);
-            unsafe { (*g).save_flowid_on_edge(true, *flow.id(), r) }
+        self.flow_table.foreach(true, |flow, r| {
+            unsafe { self.save_flowid_on_edge(true, flow, *r); }
         });
     }
     fn del_flows(&mut self, flows: Vec<Flow>) {
