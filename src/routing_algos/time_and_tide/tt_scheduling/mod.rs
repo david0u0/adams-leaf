@@ -3,7 +3,7 @@ use crate::MAX_QUEUE;
 
 type Links = Vec<(usize, f64)>;
 
-const MTU: usize = 1000;
+const MTU: usize = 1500;
 
 /// 一個大小為 size 的資料流要切成幾個封包才夠？
 #[inline(always)]

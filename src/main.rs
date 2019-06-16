@@ -21,7 +21,7 @@ fn main() -> Result<(), String> {
     let mut gcl = GCL::new(100, g.get_edge_cnt());
     gcl.insert_gate_evt(9, 0, 0, 100); // 4 -> 2
 
-    let mut algo = AdamsAnt::new(&g, None, Some(gcl));
+    let mut algo = AdamsAnt::new(&g, None, None);
     //let mut algo = RO::new(&g, gcl);
 
     algo.add_flows(flows.clone());
@@ -37,11 +37,11 @@ fn main() -> Result<(), String> {
     println!("{:?}", algo.get_route(5));
     println!("{}", algo.compute_avb_cost(&flows[5], None));
 
-    println!("{:?}", algo.get_kth_route(1, 0));
+    /*println!("{:?}", algo.get_kth_route(1, 0));
     println!("{:?}", algo.get_kth_route(1, 1));
     println!("{:?}", algo.get_kth_route(1, 2));
     println!("{:?}", algo.get_kth_route(1, 3));
-    println!("{:?}", algo.get_kth_route(1, 4));
+    println!("{:?}", algo.get_kth_route(1, 4));*/
 
     println!("sum = {}", algo.compute_all_avb_cost());
 

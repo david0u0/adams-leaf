@@ -1,9 +1,9 @@
 {
     "tt_flows": [
         {
-            "src": 0,
-            "dst": 1,
-            "size": 100,
+            "src": 4,
+            "dst": 2,
+            "size": 2000,
             "period": 10,
             "max_delay": 100,
             "offset": 20

@@ -1,6 +1,7 @@
 use crate::MAX_K;
 use crate::util::aco::ACO;
-use super::{FlowTable, AdamsAnt, compute_all_avb_cost, compute_avb_cost};
+use super::{FlowTable, AdamsAnt, compute_avb_cost, compute_all_avb_cost};
+use super::super::CostCalculator;
 
 pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128, changed: FlowTable<usize>) {
     let aco = &mut algo.aco as *mut ACO;
@@ -8,32 +9,40 @@ pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128, changed: FlowTable<usize>) 
     algo.flow_table.foreach(true, |flow, &route_k| unsafe {
         algo.save_flowid_on_edge(true, *flow.id(), route_k);
     });
-    let cur_cost = compute_all_avb_cost(algo, &algo.flow_table, &algo.gcl);
+
+    let mut calc = CostCalculator::new(algo.aco.get_state_len(), 0.0);
+    algo.flow_table.foreach(true, |flow, &route_k| {
+        let cost = algo.compute_avb_cost(flow, None);
+        calc.set_cost(*flow.id(), cost);
+    });
 
     let mut table = algo.flow_table.clone();
     let mut gcl = algo.gcl.clone();
     let vis = compute_visibility(algo, changed);
     let new_state = unsafe {
         (*aco).do_aco(time_limit, &vis, |state| {
-            algo.g.forget_all_flows();
             for (id, &route_k) in state.iter().enumerate() {
-                if table.check_flow_exist(id) && table.get_flow(id).is_avb() {
-                    algo.save_flowid_on_edge(true, id, route_k);
+                if table.check_flow_exist(id) {
                     let old_route_k = *table.get_info(id);
                     if old_route_k != route_k {
                         // 資料流存在，且在蟻群算法途中發生改變
-                        // TODO 透過只計算差異的資料流來加速
-                        table.update_info(id, route_k);
+                        if table.get_flow(id).is_avb() {
+                            algo.save_flowid_on_edge(false, id, old_route_k);
+                            algo.save_flowid_on_edge(true, id, route_k);
+                            // TODO 透過只計算受影響的資料流來加速
+                            table.update_info(id, route_k);
+                        } else {
+                            // TODO 重排 TT
+                        }
                     }
-                }
 
+                }
             }
-            // FIXME TT 要重排！
             let mut cost = compute_all_avb_cost(algo, &table, &gcl);
             println!("{:?} {}", state, cost * algo.avb_count as f64);
             cost /= algo.avb_count as f64;
             cost * cost
-        }, cur_cost)
+        }, calc.get_total_cost())
     };
     if let Some(new_state) = new_state {
         for (id, &route_k) in new_state.iter().enumerate() {

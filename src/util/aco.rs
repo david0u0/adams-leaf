@@ -3,11 +3,11 @@ use std::collections::BinaryHeap;
 use rand::Rng;
 use crate::MAX_K;
 
-const R: usize = 40;
-const L: usize = 15;
+const R: usize = 50;
+const L: usize = 20;
 const TAO0: f64 = 2.0;
 const RHO: f64 = 0.5; // 蒸發率
-const Q0: f64 = 0.2;
+const Q0: f64 = 0.4;
 const MAX_PH: f64 = 30.0;
 const MIN_PH: f64 = 0.05;
 

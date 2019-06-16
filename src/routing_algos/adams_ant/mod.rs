@@ -81,8 +81,8 @@ impl <'a> RoutingAlgo for AdamsAnt<'a> {
         }
         self.aco.extend_state_len(max_id + 1);
 
-        // FIXME TT 排程
-        // self.schedule_online(&table_changed).unwrap();
+        // TT 排程
+        self.schedule_online(&table_changed).unwrap();
 
         do_aco(self, T_LIMIT - time.elapsed().as_micros(), table_changed);
         self.g.forget_all_flows();
