@@ -14,12 +14,12 @@ pub fn compute_avb_cost(algo: &AdamsAnt, flow: &Flow, k: Option<usize>, table: &
         None => *table.get_info(*flow.id())
     };
     let max_delay = *flow.max_delay();
-    let route = algo.get_kth_route(*flow.id(), *table.get_info(*flow.id()));
+    let route = algo.get_kth_route(*flow.id(), k);
     let latency = compute_avb_latency(
         &algo.g,
         flow,
         route,
-        &table,
+        table,
         gcl
     );
     let c1 = if latency > max_delay {

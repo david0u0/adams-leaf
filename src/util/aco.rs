@@ -3,13 +3,13 @@ use std::collections::BinaryHeap;
 use rand::Rng;
 use crate::MAX_K;
 
-const R: usize = 50;
-const L: usize = 7;
-const TAO0: f64 = 10.0;
-const RHO: f64 = 0.65;
-const Q0: f64 = 0.3;
-const MAX_PH: f64 = 50.0;
-const MIN_PH: f64 = 0.5;
+const R: usize = 40;
+const L: usize = 15;
+const TAO0: f64 = 2.0;
+const RHO: f64 = 0.5; // 蒸發率
+const Q0: f64 = 0.2;
+const MAX_PH: f64 = 30.0;
+const MIN_PH: f64 = 0.05;
 
 pub enum ACOArgsF64 {
     Tao0, Rho, Q0, MaxPh, MinPh
@@ -51,25 +51,24 @@ impl Ord for WeightedState {
 }
 
 fn select_cluster(visibility: &[f64; MAX_K], pheromone: &[f64; MAX_K], k: usize, q0: f64) -> usize {
-    // FIXME 不知未何會選到可見度為0者
-    if rand::thread_rng().gen_range(0.0, 1.0) < q0 {
-        let (mut min_i, mut min) = (0, std::f64::MAX);
+    if rand::thread_rng().gen_range(0.0, 1.0) < q0 { // 直接選可能性最大者
+        let (mut max_i, mut max) = (0, std::f64::MIN);
         for i in 0..k {
-            if min > pheromone[i] * visibility[i] {
-                min = pheromone[i] * visibility[i];
-                min_i = i;
+            if max < pheromone[i] * visibility[i] {
+                max = pheromone[i] * visibility[i];
+                max_i = i;
             }
         }
-        min_i
-    } else {
+        max_i
+    } else { // 走隨機過程
         let mut sum = 0.0;
         for i in 0..k {
             sum += pheromone[i] * visibility[i];
         }
-        let rand_f = rand::thread_rng().gen_range(0.0, 1.0);
+        let rand_f = rand::thread_rng().gen_range(0.0, sum);
         let mut accumulation = 0.0;
         for i in 0..k {
-            accumulation += (pheromone[i] * visibility[i]) / sum;
+            accumulation += pheromone[i] * visibility[i];
             if accumulation >= rand_f {
                 return i;
             }
@@ -92,7 +91,7 @@ pub struct ACO {
 
 impl ACO {
     pub fn new(state_len: usize, k: usize, tao0: Option<f64>) -> Self {
-        assert!(k <= MAX_K, "K值必需在{}以下", MAX_K);
+        assert!(k <= MAX_K, "K值必需在 {} 以下", MAX_K);
         let tao0 = {
             if let Some(t) = tao0 {
                 t
@@ -131,12 +130,16 @@ impl ACO {
     ) -> Option<State> where F: FnMut(&State) -> f64 {
         let time = std::time::Instant::now();
         let mut best_state = WeightedState::new(cur_dist, None);
+        let mut epoch = 0;
         while time.elapsed().as_micros() < time_limit {
+            epoch += 1;
             let local_best_state = self.do_single_epoch(&visibility, &mut calculate_dist);
             if local_best_state.get_dist() < best_state.get_dist() {
                 best_state = local_best_state;
             }
+            println!("{:?}", self.pheromone);
         }
+        println!("ACO epoch = {}", epoch);
         best_state.state
     }
     fn do_single_epoch<F>(&mut self, visibility: &Vec<[f64; MAX_K]>,
@@ -167,7 +170,10 @@ impl ACO {
         let state_len = self.get_state_len();
         for i in 0..state_len {
             for j in 0..self.k {
-                let ph = (1.0 - self.rho) * self.pheromone[i][j];
+                let mut ph = (1.0 - self.rho) * self.pheromone[i][j];
+                if ph <= self.min_ph {
+                    ph = self.min_ph;
+                }
                 self.pheromone[i][j] = ph;
             }
         }

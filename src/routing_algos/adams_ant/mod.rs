@@ -1,4 +1,5 @@
 use std::time::Instant;
+
 use crate::util::YensAlgo;
 use crate::network_struct::Graph;
 use crate::util::aco::ACO;
@@ -37,7 +38,7 @@ impl <'a> AdamsAnt<'a> {
             tt_count: 0,
         }
     }
-    fn get_kth_route(&self, flow_id: usize, k: usize) -> &Vec<usize> {
+    pub fn get_kth_route(&self, flow_id: usize, k: usize) -> &Vec<usize> {
         let flow = self.flow_table.get_flow(flow_id);
         self.yens_algo.get_kth_route(*flow.src(), *flow.dst(), k)
     }
@@ -67,23 +68,23 @@ impl <'a> RoutingAlgo for AdamsAnt<'a> {
         let time = Instant::now();
         let mut max_id = 0;
         self.flow_table.insert(flows.clone(), 0);
-        let mut tt_changed = self.flow_table.clone_into_changed_table();
+        let mut table_changed = self.flow_table.clone_into_changed_table();
         for flow in flows.iter() {
             max_id = std::cmp::max(max_id, *flow.id());
             self.yens_algo.compute_routes(*flow.src(), *flow.dst());
+            table_changed.update_info(*flow.id(), 0);
             if flow.is_avb() {
                 self.avb_count += 1;
             } else {
-                tt_changed.update_info(*flow.id(), 0);
                 self.tt_count += 1;
             }
         }
         self.aco.extend_state_len(max_id + 1);
 
-        // TT 排程
-        self.schedule_online(&tt_changed).unwrap();
+        // FIXME TT 排程
+        // self.schedule_online(&table_changed).unwrap();
 
-        do_aco(self, T_LIMIT - time.elapsed().as_micros());
+        do_aco(self, T_LIMIT - time.elapsed().as_micros(), table_changed);
         self.g.forget_all_flows();
         self.flow_table.foreach(true, |flow, r| {
             unsafe { self.save_flowid_on_edge(true, *flow.id(), *r) }
