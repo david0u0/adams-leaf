@@ -51,6 +51,7 @@ impl Ord for WeightedState {
 }
 
 fn select_cluster(visibility: &[f64; MAX_K], pheromone: &[f64; MAX_K], k: usize, q0: f64) -> usize {
+    // FIXME 不知未何會選到可見度為0者
     if rand::thread_rng().gen_range(0.0, 1.0) < q0 {
         let (mut min_i, mut min) = (0, std::f64::MAX);
         for i in 0..k {
@@ -110,9 +111,13 @@ impl ACO {
             min_ph: MIN_PH
         }
     }
+    #[inline(always)]
+    pub fn get_state_len(&self) -> usize {
+        self.pheromone.len()
+    }
     pub fn extend_state_len(&mut self, new_len: usize) {
-        if new_len > self.pheromone.len() {
-            let diff_len = new_len - self.pheromone.len();
+        if new_len > self.get_state_len() {
+            let diff_len = new_len - self.get_state_len();
             let tao0 = self.tao0;
             self.pheromone.extend((0..diff_len).map(|_| [tao0; MAX_K]));
         }
@@ -138,7 +143,7 @@ impl ACO {
         calculate_dist: &mut F) -> WeightedState
     where F: FnMut(&State) -> f64 {
         let mut max_heap: BinaryHeap<WeightedState> = BinaryHeap::new();
-        let state_len = self.pheromone.len();
+        let state_len = self.get_state_len();
         for _ in 0..self.r {
             let mut cur_state = Vec::<usize>::with_capacity(state_len);
             for i in 0..state_len {
@@ -159,7 +164,7 @@ impl ACO {
         best_state
     }
     fn evaporate(&mut self) {
-        let state_len = self.pheromone.len();
+        let state_len = self.get_state_len();
         for i in 0..state_len {
             for j in 0..self.k {
                 let ph = (1.0 - self.rho) * self.pheromone[i][j];

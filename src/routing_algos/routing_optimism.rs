@@ -6,7 +6,7 @@ use super::time_and_tide::compute_avb_latency;
 
 const K: usize = 20;
 const ALPHA_PORTION: f64 = 0.5;
-const T_LIMIT: u128 = 1000 * 100; // micro_sec
+const T_LIMIT: u128 = 1000 * 10; // micro_sec
 const C1_EXCEED: f64 = 100.0;
 const W1: f64 = 1.0;
 const W2: f64 = 1.0;
@@ -42,13 +42,11 @@ impl <'a> RO<'a> {
         }
     }
     pub fn compute_avb_cost(&self, flow: &Flow, k: Option<usize>) -> f64 {
-        let max_delay = *flow.max_delay();
-        let k = {
-            match k {
-                Some(t) => t,
-                None => *self.flow_table.get_info(*flow.id())
-            }
+        let k = match k {
+            Some(t) => t,
+            None => *self.flow_table.get_info(*flow.id())
         };
+        let max_delay = *flow.max_delay();
         let route = self.get_kth_route(flow, k);
         let latency = compute_avb_latency(
             &self.g,
@@ -101,7 +99,7 @@ impl <'a> RO<'a> {
                 min_cost = cost;
                 println!("found min_cost = {} at first glance!", cost);
             }
-            // println!("start iteration #{}", iter_times);
+            println!("start iteration #{}", iter_times);
             min_cost = self.hill_climbing(&time, min_cost, &mut best_all_routing);
         }
         self.flow_table = best_all_routing;

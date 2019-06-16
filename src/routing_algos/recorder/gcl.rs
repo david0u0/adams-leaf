@@ -27,6 +27,7 @@ mod test {
     }
 }
 
+#[derive(Clone)]
 pub struct GCL {
     hyper_p: u32,
     // TODO 這個資料結構有優化的空間
