@@ -49,6 +49,21 @@ pub fn read_flows_from_file(base_id: usize, file_name: &str) -> Vec<Flow> {
     flows
 }
 
+use network_struct::Graph;
+pub fn read_topo_from_file(file_name: &str) -> routing_algos::StreamAwareGraph {
+    let txt = fs::read_to_string(file_name)
+        .expect(&format!("找不到檔案: {}", file_name));
+    let json: GraphJSON = serde_json::from_str(&txt)
+        .expect(&format!("無法解析檔案: {}", file_name));
+    let mut g = routing_algos::StreamAwareGraph::new();
+    g.add_host(Some(json.host_cnt));
+    g.add_switch(Some(json.switch_cnt));
+    for (n1, n2, bandwidth) in json.edges.into_iter() {
+        g.add_edge((n1, n2), bandwidth);
+    }
+    g
+}
+
 #[derive(Serialize, Deserialize)]
 struct AllFlows {
     tt_flows: Vec<TTFlow>,
@@ -71,4 +86,11 @@ struct AVBFlow {
     period: u32,
     max_delay: u32,
     avb_type: char
+}
+
+#[derive(Serialize, Deserialize)]
+struct GraphJSON {
+    host_cnt: usize,
+    switch_cnt: usize,
+    edges: Vec<(usize, usize, f64)>
 }

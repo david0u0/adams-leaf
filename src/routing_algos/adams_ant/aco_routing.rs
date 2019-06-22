@@ -60,15 +60,13 @@ fn compute_visibility(algo: &AdamsAnt, changed: FlowTable<usize>) -> Vec<[f64; M
     algo.flow_table.foreach(true, |flow, &route_k| {
         let id = *flow.id();
         for i in 0..algo.get_candidate_count(flow) {
-            if changed.check_flow_exist(id) { // 是新資料流，賦與所有路徑平均的能見度
-                vis[id][i] = 10.0;
-            } else { // 是舊資料流，壓低其它路徑的能見度
-                vis[id][i] = 1.0;
-            }
+            vis[id][i] = 1.0 / algo.compute_avb_cost(flow, Some(i));
         }
-        vis[id][route_k] = 10.0;
+        if !changed.check_flow_exist(id) { // 是舊資料流，調高本來路徑的能見度
+            vis[id][route_k] *= 10.0; // TODO 此處需調參
+        }
     });
-    algo.flow_table.foreach(false, |flow, &route_k| {
+    algo.flow_table.foreach(false, |flow, _| {
         let id = *flow.id();
         vis[id][0] = 10.0;
     });
