@@ -136,7 +136,7 @@ impl GCL {
         }
         None
     }
-    pub fn remove_flow(&mut self, links: &Vec<usize>, flow_id: usize) {
+    pub fn delete_flow(&mut self, links: &Vec<usize>, flow_id: usize) {
         for &link_id in links.iter() {
             let gate_evt = &mut self.gate_evt[link_id];
             let mut i = 0;

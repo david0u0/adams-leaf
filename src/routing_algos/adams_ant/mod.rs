@@ -45,10 +45,12 @@ impl <'a> AdamsAnt<'a> {
     fn get_candidate_count(&self, flow: &Flow) -> usize {
         self.yens_algo.get_route_count(*flow.src(), *flow.dst())
     }
-    fn schedule_online(&mut self, changed_table: &FT) -> Result<(), ()> {
+    fn schedule_online(&self, gcl: &mut GCL,
+        og_table: &mut FT, changed_table: &FT
+    ) -> Result<bool, ()> {
         let _self = self as *const Self;
         unsafe {
-            schedule_online(&mut self.flow_table, changed_table, &mut self.gcl,
+            schedule_online(og_table, changed_table, gcl,
                 |flow, &k| {
                     let r = (*_self).get_kth_route(*flow.id(), k);
                     (*_self).g.get_links_id_bandwidth(r)
@@ -82,7 +84,10 @@ impl <'a> RoutingAlgo for AdamsAnt<'a> {
         self.aco.extend_state_len(max_id + 1);
 
         // TT 排程
-        self.schedule_online(&table_changed).unwrap();
+        let _self = self as *const Self;
+        unsafe {
+            (*_self).schedule_online(&mut self.gcl, &mut self.flow_table, &table_changed).unwrap();
+        }
 
         do_aco(self, T_LIMIT - time.elapsed().as_micros(), table_changed);
         self.g.forget_all_flows();
