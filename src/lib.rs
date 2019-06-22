@@ -13,9 +13,9 @@ use routing_algos::{Flow, AVBType};
 pub fn read_flows_from_file(base_id: usize, file_name: &str) -> Vec<Flow> {
     let mut flows = vec![];
     let txt = fs::read_to_string(file_name)
-        .expect(&format!("無法讀取{}", file_name).as_str());
+        .expect(&format!("找不到檔案: {}", file_name));
     let all_flows: AllFlows = serde_json::from_str(&txt)
-        .expect(&format!("無法解析{}", file_name));
+        .expect(&format!("無法解析檔案: {}", file_name));
     for flow in all_flows.tt_flows.iter() {
         flows.push(Flow::TT {
             id: flows.len() + base_id,
