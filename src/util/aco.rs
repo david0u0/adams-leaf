@@ -3,12 +3,12 @@ use std::collections::BinaryHeap;
 use rand::Rng;
 use crate::MAX_K;
 
-const R: usize = 50;
+const R: usize = 60;
 const L: usize = 20;
-const TAO0: f64 = 15.0;
+const TAO0: f64 = 10.0;
 const RHO: f64 = 0.5; // 蒸發率
 const Q0: f64 = 0.4;
-const MAX_PH: f64 = 30.0;
+const MAX_PH: f64 = 15.0;
 const MIN_PH: f64 = 0.05;
 
 pub enum ACOArgsF64 {
@@ -157,14 +157,8 @@ impl ACO {
             let dist = calculate_dist(&cur_state);
             max_heap.push(WeightedState::new(dist, Some(cur_state)));
         }
-        // offline update
         self.evaporate();
-        let best_state = max_heap.pop().unwrap();
-        self.update_pheromon(&best_state);
-        for _ in 0..self.l-1 {
-            self.update_pheromon(&max_heap.pop().unwrap());
-        }
-        best_state
+        self.offline_update(max_heap)
     }
     fn evaporate(&mut self) {
         let state_len = self.get_state_len();
@@ -177,6 +171,15 @@ impl ACO {
                 self.pheromone[i][j] = ph;
             }
         }
+    }
+    fn offline_update(&mut self, mut max_heap: BinaryHeap<WeightedState>) -> WeightedState {
+        let best_state = max_heap.pop().unwrap();
+        self.update_pheromon(&best_state);
+        for _ in 0..self.l-1 {
+            let w_state = max_heap.pop().unwrap();
+            self.update_pheromon(&w_state);
+        }
+        best_state
     }
     fn update_pheromon(&mut self, w_state: &WeightedState) {
         let dist = w_state.get_dist();

@@ -57,6 +57,7 @@ impl GCL {
     /// 回傳 `link_id` 上所有閘門關閉事件。
     /// * `回傳值` - 一個陣列，其內容為 (事件開始時間, 事件持續時間, 閘門編號, 資料流編號);
     pub fn get_gate_events(&self, link_id: usize) -> &Vec<(u32, u32, u8, usize)> {
+        // TODO 用另一個陣列存一個查找表，把首尾相接的閘門事件串起來
         assert!(self.gate_evt.len() > link_id, "GCL: 指定了超出範圍的邊");
         return &self.gate_evt[link_id];
     }

@@ -64,9 +64,9 @@ pub fn schedule_online<T: Clone, F: Fn(&Flow, &T) -> Links>(
         schedule_fixed_og(og_table, gcl, |f: &Flow, t: &T| {
             get_links(f, t)
         })?;
-        Ok(false)
-    } else {
         Ok(true)
+    } else {
+        Ok(false)
     }
 }
 

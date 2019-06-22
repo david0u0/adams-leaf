@@ -73,8 +73,11 @@ unsafe fn compute_aco_dist(algo: &mut AdamsAnt, state: &Vec<usize>) -> f64 {
             }
         }
     }
-    let wipeout = algo.schedule_online(&mut gcl, &mut table, &tt_changed_table).unwrap();
-    let cost1 = if wipeout { 0.0 } else { 1.0 };
+    let result = algo.schedule_online(&mut gcl, &mut table, &tt_changed_table);
+    if result.is_err() {
+        return std::f64::MAX;
+    }
+    let cost1 = if result.unwrap() { 1.0 } else { 0.0 };
 
     // 第二輪：計算 AVB 的花費
     for (id, &route_k) in state.iter().enumerate() {
@@ -93,7 +96,9 @@ unsafe fn compute_aco_dist(algo: &mut AdamsAnt, state: &Vec<usize>) -> f64 {
     }
     let cost2 = compute_all_avb_cost(algo, &table, &gcl) / algo.avb_count as f64;
 
-    let mut cost = W1 * cost1 + W2 * cost2;
+    let cost = W1 * cost1 + W2 * cost2;
     println!("{:?} {}", state, cost * algo.avb_count as f64);
-    cost * cost
+    let base: f64 = 10.0;
+    base.powf(cost - 1.0)
+    //cost * cost
 }

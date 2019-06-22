@@ -1,8 +1,11 @@
 use rand::Rng;
 
 use crate::util::YensAlgo;
+use crate::network_struct::Graph;
 use super::{StreamAwareGraph, FlowTable, Flow, RoutingAlgo, GCL};
-use super::time_and_tide::compute_avb_latency;
+use super::time_and_tide::{compute_avb_latency, schedule_online};
+
+type FT = FlowTable<usize>;
 
 const K: usize = 20;
 const ALPHA_PORTION: f64 = 0.5;
@@ -23,7 +26,7 @@ fn gen_n_distinct_outof_k(n: usize, k: usize) -> Vec<usize> {
 
 pub struct RO<'a> {
     g: StreamAwareGraph,
-    flow_table: FlowTable<usize>,
+    flow_table: FT,
     yens_algo: YensAlgo<'a, usize, StreamAwareGraph>,
     gcl: GCL,
     avb_count: usize,
@@ -31,14 +34,15 @@ pub struct RO<'a> {
 }
 
 impl <'a> RO<'a> {
-    pub fn new(g: &'a StreamAwareGraph, gcl: GCL) -> Self {
+    pub fn new(g: &'a StreamAwareGraph, flow_table: Option<FT>, gcl: Option<GCL>) -> Self {
+        let flow_table = flow_table.unwrap_or(FlowTable::new());
+        let gcl = gcl.unwrap_or(GCL::new(1, g.get_edge_cnt()));
         RO {
-            gcl,
             g: g.clone(),
-            flow_table: FlowTable::new(),
             yens_algo: YensAlgo::new(g, K),
-            avb_count: 0,
-            tt_count: 0,
+            avb_count: flow_table.get_count(true),
+            tt_count: flow_table.get_count(false),
+            gcl, flow_table,
         }
     }
     pub fn compute_avb_cost(&self, flow: &Flow, k: Option<usize>) -> f64 {
@@ -125,7 +129,7 @@ impl <'a> RO<'a> {
         best_k
     }
     fn hill_climbing(&mut self, time: &std::time::Instant,
-        mut min_cost: f64, best_all_routing: &mut FlowTable<usize>
+        mut min_cost: f64, best_all_routing: &mut FT
     ) -> f64 {
         let mut iter_times = 0;
         while time.elapsed().as_micros() < T_LIMIT {
@@ -184,15 +188,28 @@ impl <'a> RO<'a> {
 }
 impl <'a> RoutingAlgo for RO<'a> {
     fn add_flows(&mut self, flows: Vec<Flow>) {
+        self.flow_table.insert(flows.clone(), 0);
+        let mut tt_changed = self.flow_table.clone_into_changed_table();
         for flow in flows.iter() {
             self.yens_algo.compute_routes(*flow.src(), *flow.dst());
             if flow.is_avb() {
                 self.avb_count += 1;
             } else {
                 self.tt_count += 1;
+                tt_changed.update_info(*flow.id(), 0);
             }
         }
-        self.flow_table.insert(flows, 0);
+        // TT schedule
+        unsafe {
+            let _self = self as *mut Self;
+            schedule_online(&mut (*_self).flow_table, &tt_changed, &mut (*_self).gcl,
+                |flow, &k| {
+                    let r = self.get_kth_route(flow, k);
+                    self.g.get_links_id_bandwidth(r)
+                }
+            ).unwrap();
+        }
+
         self.grasp();
         self.g.forget_all_flows();
         self.flow_table.foreach(true, |flow, r| {

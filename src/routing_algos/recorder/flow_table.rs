@@ -151,6 +151,11 @@ impl <T: Clone> FlowTable<T> {
         let b = &*other.flow_list as *const Vec<Option<Flow>>;
         a == b
     }
+    pub fn get_count(&self, is_avb: bool) -> usize {
+        let mut cnt = 0;
+        self.foreach(is_avb, |_, _| cnt += 1);
+        cnt
+    }
 }
 
 #[cfg(test)]
@@ -208,13 +213,6 @@ mod test {
         table.union(true, &table2);
     }
     fn count_flows_inside(table: &FlowTable<usize>) -> usize {
-        let mut cnt = 0;
-        table.foreach(true, |_, _| {
-            cnt += 1;
-        });
-        table.foreach(false, |_, _| {
-            cnt += 1;
-        });
-        cnt
+        table.get_count(true) + table.get_count(false)
     }
 }
