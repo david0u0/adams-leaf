@@ -80,9 +80,9 @@ pub fn schedule_fixed_og<T: Clone, F: Fn(&Flow, &T) -> Links>(
     tt_flows.sort_by(|&id1, &id2| {
         cmp_flow(id1, id2, changed_table, |f, t| get_links(f, t))
     });
-    for id in tt_flows.into_iter() {
-        let flow = changed_table.get_flow(id);
-        let links = get_links(flow, changed_table.get_info(id));
+    for flow_id in tt_flows.into_iter() {
+        let flow = changed_table.get_flow(flow_id);
+        let links = get_links(flow, changed_table.get_info(flow_id));
         let mut all_offsets: Vec<Vec<f64>> = vec![];
         // NOTE 一個資料流的每個封包，在單一埠口上必需採用同一個佇列
         let mut ro: Vec<u8> = vec![0; links.len()];
@@ -104,7 +104,7 @@ pub fn schedule_fixed_og<T: Clone, F: Fn(&Flow, &T) -> Links>(
             let link_id = links[i].0;
             let queue_id = ro[i];
             let trans_time = ((MTU as f64) / links[i].1) as u32;
-            gcl.set_queueid(queue_id, link_id, id);
+            gcl.set_queueid(queue_id, link_id, flow_id);
             // 考慮 hyper period 中每個狀況
             let p = *flow.period() as usize;
             for time_shift in (0..gcl.get_hyper_p()).step_by(p) {
@@ -112,6 +112,7 @@ pub fn schedule_fixed_og<T: Clone, F: Fn(&Flow, &T) -> Links>(
                     // insert gate evt
                     gcl.insert_gate_evt(
                         link_id,
+                        flow_id,
                         queue_id,
                         time_shift + all_offsets[m][i] as u32, 
                         trans_time);
@@ -125,6 +126,7 @@ pub fn schedule_fixed_og<T: Clone, F: Fn(&Flow, &T) -> Links>(
                     let queue_evt_duration = all_offsets[m][i] as u32 - queue_evt_start;
                     gcl.insert_queue_evt(
                         link_id,
+                        flow_id,
                         queue_id,
                         time_shift + queue_evt_start,
                         queue_evt_duration

@@ -69,13 +69,16 @@ fn test_online_schedule() {
     let mut gcl = GCL::new(600, 16);
     let ft = gen_flow_table();
 
-    schedule_fixed_og(&ft, &mut gcl, |_, info| info.clone());
+    schedule_fixed_og(&ft, &mut gcl, |_, info| info.clone()).unwrap();
     //schedule_online(&ft, &ft, &mut gcl, |_, info| info);
-    let ans = vec![(0, 1, 0), (1, 1, 0), (2, 1, 0), (3, 1, 0),
-        (4, 1, 0), (150, 1, 0), (151, 1, 0), (152, 1, 0), (203, 1, 0),
-        (204, 1, 0), (300, 1, 0), (301, 1, 0), (302, 1, 0), (403, 1, 0),
-        (404, 1, 0), (450, 1, 0), (451, 1, 0), (452, 1, 0)];
-    assert_eq!(gcl.get_gate_events(2), &ans);
+    let ans: Vec<u32> = vec![0, 1, 2, 3, 4,
+        150, 151, 152,
+        203, 204,
+        300, 301, 302,
+        403, 404, 450,
+        451, 452];
+    let start_times: Vec<_> = gcl.get_gate_events(2).iter().map(|(t, ..)| *t).collect();
+    assert_eq!(start_times, ans);
     //panic!("{:?}", gcl.get_gate_events(7));
     //panic!("{:?}", gcl.get_gate_events(6));
 }

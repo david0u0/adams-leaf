@@ -31,8 +31,8 @@ mod test {
 pub struct GCL {
     hyper_p: u32,
     // TODO 這個資料結構有優化的空間
-    gate_evt: Vec<Vec<(u32, u32, u8)>>,
-    queue_occupy_evt: Vec<[Vec<(u32, u32)>; MAX_QUEUE as usize]>,
+    gate_evt: Vec<Vec<(u32, u32, u8, usize)>>,
+    queue_occupy_evt: Vec<[Vec<(u32, u32, usize)>; MAX_QUEUE as usize]>,
     queue_map: HashMap<(usize, usize), u8>,
 }
 impl GCL {
@@ -55,15 +55,15 @@ impl GCL {
         self.hyper_p
     }
     /// 回傳 `link_id` 上所有閘門關閉事件。
-    /// * `回傳值` - 一個陣列，其內容為 (事件開始時間, 事件持續時間);
-    pub fn get_gate_events(&self, link_id: usize) -> &Vec<(u32, u32, u8)> {
+    /// * `回傳值` - 一個陣列，其內容為 (事件開始時間, 事件持續時間, 閘門編號, 資料流編號);
+    pub fn get_gate_events(&self, link_id: usize) -> &Vec<(u32, u32, u8, usize)> {
         assert!(self.gate_evt.len() > link_id, "GCL: 指定了超出範圍的邊");
         return &self.gate_evt[link_id];
     }
-    pub fn insert_gate_evt(&mut self, link_id: usize,
+    pub fn insert_gate_evt(&mut self, link_id: usize, flow_id: usize,
         queue_id: u8, start_time: u32, duration: u32
     ) {
-        let entry = (start_time, duration, queue_id);
+        let entry = (start_time, duration, queue_id, flow_id);
         let evts = &mut self.gate_evt[link_id];
         match evts.binary_search(&entry) {
             Ok(_) => {
@@ -74,10 +74,10 @@ impl GCL {
             Err(pos) => evts.insert(pos, entry)
         }
     }
-    pub fn insert_queue_evt(&mut self, link_id: usize,
+    pub fn insert_queue_evt(&mut self, link_id: usize, flow_id: usize,
         queue_id: u8, start_time: u32, duration: u32
     ) {
-        let entry = (start_time, duration);
+        let entry = (start_time, duration, flow_id);
         let evts = &mut self.queue_occupy_evt[link_id][queue_id as usize];
         match evts.binary_search(&entry) {
             Ok(_) => panic!("插入重複的佇列事件"), // TODO 還有更多可能的錯誤
@@ -105,7 +105,7 @@ impl GCL {
     /// 回傳一組資料(usize, bool)，前者代表時間，後者代表該時間是閘門事件的開始還是結束（真代表開始）
     fn get_next_spot(&self, link_id: usize, time: u32) -> (u32, bool) {
         // TODO 應該用二元搜索來優化?
-        for &(start, duration, _) in self.gate_evt[link_id].iter() {
+        for &(start, duration, _, _) in self.gate_evt[link_id].iter() {
             if start > time {
                 return (start, true);
             } else if start + duration > time {
@@ -125,7 +125,7 @@ impl GCL {
         link_id: usize, queue_id: u8, time: u32,
     ) -> Option<u32> {
         let evts = &self.queue_occupy_evt[link_id][queue_id as usize];
-        for &(start, duration) in evts.iter() {
+        for &(start, duration, _) in evts.iter() {
             if start <= time {
                 if start + duration > time {
                     return Some(start + duration);
@@ -135,5 +135,29 @@ impl GCL {
             }
         }
         None
+    }
+    pub fn remove_flow(&mut self, links: &Vec<usize>, flow_id: usize) {
+        for &link_id in links.iter() {
+            let gate_evt = &mut self.gate_evt[link_id];
+            let mut i = 0;
+            while i < gate_evt.len() {
+                if gate_evt[i].3 == flow_id {
+                    gate_evt.remove(i);
+                } else {
+                    i += 1;
+                }
+            }
+            for queue_id in 0..MAX_QUEUE {
+                let queue_evt = &mut self.queue_occupy_evt[link_id][queue_id as usize];
+                let mut i = 0;
+                while i < queue_evt.len() {
+                    if queue_evt[i].2 == flow_id {
+                        queue_evt.remove(i);
+                    } else {
+                        i += 1;
+                    }
+                }
+            }
+        }
     }
 }

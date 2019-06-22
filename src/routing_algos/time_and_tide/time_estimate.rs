@@ -141,20 +141,20 @@ mod test {
         flow_table.insert(vec![flows[1].clone()], 0);
         g.save_flowid_on_edge(true, 1, &vec![0, 1, 2]);
 
-        gcl.insert_gate_evt(0, 0, 0, 10);
+        gcl.insert_gate_evt(0, 99, 0, 0, 10);
         assert_eq!(compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
             ((MAX_BE_SIZE/100.0 + 1.0 + 2.0) * 2.0 + 10.0) as u32);
 
-        gcl.insert_gate_evt(0, 0, 15, 5);
+        gcl.insert_gate_evt(0, 99, 0, 15, 5);
         assert_eq!(compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
             ((MAX_BE_SIZE/100.0 + 1.0 + 2.0) * 2.0 + 15.0) as u32);
 
-        gcl.insert_gate_evt(2, 0, 100, 100);
+        gcl.insert_gate_evt(2, 99, 0, 100, 100);
         // 雖然這個關閉事件跟前面兩個不可能同時發生，但為了計算快速，還是假裝全部都發生了
         assert_eq!(compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
             ((MAX_BE_SIZE/100.0 + 1.0 + 2.0) * 2.0 + 115.0) as u32);
         
-        gcl.insert_gate_evt(0, 0, 100, 100);
+        gcl.insert_gate_evt(0, 99, 0, 100, 100);
         // 這個事件與同個埠口上的前兩個事件不可能同時發生，選比較久的（即這個事件）
         assert_eq!(compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
             ((MAX_BE_SIZE/100.0 + 1.0 + 2.0) * 2.0 + 200.0) as u32);

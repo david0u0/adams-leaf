@@ -113,9 +113,6 @@ pub use routing_optimism::RO;
 mod recorder;
 pub use recorder::{FlowTable, GCL};
 
-mod cost_calculator;
-pub use cost_calculator::CostCalculator;
-
 pub(self) mod time_and_tide;
 
 mod adams_ant;

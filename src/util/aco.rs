@@ -5,7 +5,7 @@ use crate::MAX_K;
 
 const R: usize = 50;
 const L: usize = 20;
-const TAO0: f64 = 2.0;
+const TAO0: f64 = 15.0;
 const RHO: f64 = 0.5; // 蒸發率
 const Q0: f64 = 0.4;
 const MAX_PH: f64 = 30.0;

@@ -13,12 +13,12 @@ fn main() -> Result<(), String> {
             "test_flows.json".to_owned()
         }
     };
+    let flows = read_flows_from_file(0, &flow_file_name);
     let mut g = read_topo_from_file("test_graph.json");
     // FIXME 對這個圖作 Yens algo，0->2這條路有時找得到6條，有時只找得到5條
 
-    let flows = read_flows_from_file(0, &flow_file_name);
     let mut gcl = GCL::new(100, g.get_edge_cnt());
-    gcl.insert_gate_evt(9, 0, 0, 100); // 4 -> 2
+    gcl.insert_gate_evt(9, 999, 0, 0, 100); // 4 -> 2
 
     let mut algo = AdamsAnt::new(&g, None, None);
     //let mut algo = RO::new(&g, gcl);
