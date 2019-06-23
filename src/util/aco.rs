@@ -137,10 +137,10 @@ impl ACO {
             if local_best_state.get_dist() < best_state.get_dist() {
                 best_state = local_best_state;
             }
-            #[cfg(not(release))]
+            #[cfg(debug_assertions)]
             println!("{:?}", self.pheromone);
         }
-        #[cfg(not(release))]
+        #[cfg(debug_assertions)]
         println!("ACO epoch = {}", epoch);
         best_state.state.unwrap()
     }

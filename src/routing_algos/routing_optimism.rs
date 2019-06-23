@@ -1,5 +1,7 @@
 use rand::Rng;
+use std::time::Instant;
 
+use crate::T_LIMIT;
 use crate::util::YensAlgo;
 use crate::network_struct::Graph;
 use super::{StreamAwareGraph, FlowTable, Flow, RoutingAlgo, GCL};
@@ -9,7 +11,6 @@ type FT = FlowTable<usize>;
 
 const K: usize = 20;
 const ALPHA_PORTION: f64 = 0.5;
-const T_LIMIT: u128 = 1000 * 10; // micro_sec
 const C1_EXCEED: f64 = 100.0;
 const W1: f64 = 1.0;
 const W2: f64 = 1.0;
@@ -76,8 +77,7 @@ impl <'a> RO<'a> {
         cost
     }
     /// 在所有 TT 都被排定的狀況下去執行 GRASP 優化
-    fn grasp(&mut self) {
-        let time = std::time::Instant::now();
+    fn grasp(&mut self, time: Instant) {
         let mut iter_times = 0;
         let mut min_cost = std::f64::MAX;
         let mut best_all_routing = FlowTable::<usize>::new();
@@ -200,6 +200,7 @@ impl <'a> RoutingAlgo for RO<'a> {
                 tt_changed.update_info(*flow.id(), 0);
             }
         }
+        let time = Instant::now();
         // TT schedule
         unsafe {
             let _self = self as *mut Self;
@@ -211,7 +212,7 @@ impl <'a> RoutingAlgo for RO<'a> {
             ).unwrap();
         }
 
-        self.grasp();
+        self.grasp(time);
         self.g.forget_all_flows();
         self.flow_table.foreach(true, |flow, r| {
             unsafe { self.save_flowid_on_edge(true, flow, *r); }
@@ -232,7 +233,7 @@ impl <'a> RoutingAlgo for RO<'a> {
         println!("TT Flows:");
         self.flow_table.foreach(false, |flow, &route_k| {
             let route = self.get_kth_route(flow, route_k);
-            println!("flow id = {}, {} route = {:?}", *flow.id(), route_k, route);
+            println!("flow id = {}, route = {:?}", *flow.id(), route);
         });
         println!("AVB Flows:");
         self.flow_table.foreach(true, |flow, &route_k| {

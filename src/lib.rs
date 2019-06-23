@@ -7,6 +7,7 @@ pub mod routing_algos;
 pub mod util;
 pub const MAX_QUEUE: u8 = 8;
 pub const MAX_K: usize = 20;
+pub const T_LIMIT: u128 = 1000 * 10; // micro_sec
 
 use routing_algos::{Flow, AVBType};
 

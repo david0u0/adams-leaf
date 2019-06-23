@@ -1,5 +1,6 @@
-use crate::util::YensAlgo;
+use crate::T_LIMIT;
 use crate::network_struct::Graph;
+use crate::util::YensAlgo;
 use crate::util::aco::ACO;
 use super::{StreamAwareGraph, RoutingAlgo, Flow, FlowTable, GCL};
 use super::time_and_tide::schedule_online;
@@ -12,7 +13,6 @@ use aco_routing::do_aco;
 
 type FT = FlowTable<usize>;
 const K: usize = 20;
-const T_LIMIT: u128 = 10 * 1000;
 
 pub struct AdamsAnt<'a> {
     aco: ACO,

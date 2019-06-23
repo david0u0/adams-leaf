@@ -111,7 +111,7 @@ unsafe fn compute_aco_dist(algo: &mut AdamsAnt, state: &Vec<usize>, best_dist: &
 
     let cost = W1 * cost1 + W2 * cost2;
 
-    #[cfg(not(release))]
+    #[cfg(debug_assertions)]
     println!("{:?} {}", state, cost2 * algo.avb_count as f64);
 
     let base: f64 = 10.0;
