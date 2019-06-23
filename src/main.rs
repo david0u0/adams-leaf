@@ -22,7 +22,7 @@ fn main() -> Result<(), String> {
 
     if algo_type == "aco" {
         let mut algo = AdamsAnt::new(&g, None, None);
-        algo.add_flows(flows.clone());
+        algo.add_flows_in_time(flows.clone(), 1000 * 500);
         algo.add_flows(flows2.clone());
         algo.show_results();
     } else if algo_type == "ro" {

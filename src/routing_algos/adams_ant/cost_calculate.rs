@@ -3,7 +3,7 @@ use super::{Flow, AdamsAnt, FlowTable, GCL};
 
 type FT = FlowTable<usize>;
 
-const C1_EXCEED: f64 = 1000.0;
+const C1_EXCEED: f64 = 100.0;
 const W1: f64 = 1.0;
 const W2: f64 = 1.0;
 const W3: f64 = 1.0;

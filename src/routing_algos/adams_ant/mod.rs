@@ -65,26 +65,7 @@ impl <'a> AdamsAnt<'a> {
 
 impl <'a> RoutingAlgo for AdamsAnt<'a> {
     fn add_flows(&mut self, flows: Vec<Flow>) {
-        let mut max_id = 0;
-        self.flow_table.insert(flows.clone(), 0);
-        let mut reconf = self.flow_table.clone_into_changed_table();
-        for flow in flows.iter() {
-            max_id = std::cmp::max(max_id, *flow.id());
-            self.yens_algo.compute_routes(*flow.src(), *flow.dst());
-            reconf.update_info(*flow.id(), 0);
-            if flow.is_avb() {
-                self.avb_count += 1;
-            } else {
-                self.tt_count += 1;
-            }
-        }
-        self.aco.extend_state_len(max_id + 1);
-
-        do_aco(self, T_LIMIT, reconf);
-        self.g.forget_all_flows();
-        self.flow_table.foreach(true, |flow, r| {
-            unsafe { self.save_flowid_on_edge(true, *flow.id(), *r) }
-        });
+        self.add_flows_in_time(flows, T_LIMIT);
     }
     fn del_flows(&mut self, flows: Vec<Flow>) {
         unimplemented!();
@@ -118,5 +99,27 @@ impl <'a> AdamsAnt<'a> {
     }
     pub fn compute_all_avb_cost(&self) -> f64 {
         compute_all_avb_cost(self, &self.flow_table, &self.gcl)
+    }
+    pub fn add_flows_in_time(&mut self, flows: Vec<Flow>, t_limit: u128) {
+        let mut max_id = 0;
+        self.flow_table.insert(flows.clone(), 0);
+        let mut reconf = self.flow_table.clone_into_changed_table();
+        for flow in flows.iter() {
+            max_id = std::cmp::max(max_id, *flow.id());
+            self.yens_algo.compute_routes(*flow.src(), *flow.dst());
+            reconf.update_info(*flow.id(), 0);
+            if flow.is_avb() {
+                self.avb_count += 1;
+            } else {
+                self.tt_count += 1;
+            }
+        }
+        self.aco.extend_state_len(max_id + 1);
+
+        do_aco(self, t_limit, reconf);
+        self.g.forget_all_flows();
+        self.flow_table.foreach(true, |flow, r| {
+            unsafe { self.save_flowid_on_edge(true, *flow.id(), *r) }
+        });
     }
 }
