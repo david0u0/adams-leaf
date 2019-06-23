@@ -7,8 +7,8 @@ const R: usize = 60;
 const L: usize = 20;
 const TAO0: f64 = 25.0;
 const RHO: f64 = 0.5; // 蒸發率
-const Q0: f64 = 0.4;
-const MAX_PH: f64 = 50.0;
+const Q0: f64 = 0.0;
+const MAX_PH: f64 = 30.0;
 const MIN_PH: f64 = 1.0;
 
 pub enum ACOArgsF64 {
@@ -235,7 +235,7 @@ mod test {
                 }
             }
             cost / 6.0
-        }, std::f64::MAX).unwrap();
+        });
         assert_eq!(vec![0, 1, 0, 1, 0, 1, 0, 1, 0, 1], new_state);
     }
 }
