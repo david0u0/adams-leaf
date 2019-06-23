@@ -8,7 +8,7 @@ const L: usize = 20;
 const TAO0: f64 = 10.0;
 const RHO: f64 = 0.5; // 蒸發率
 const Q0: f64 = 0.4;
-const MAX_PH: f64 = 15.0;
+const MAX_PH: f64 = 20.0;
 const MIN_PH: f64 = 0.05;
 
 pub enum ACOArgsF64 {
@@ -137,8 +137,10 @@ impl ACO {
             if local_best_state.get_dist() < best_state.get_dist() {
                 best_state = local_best_state;
             }
+            #[cfg(not(release))]
             println!("{:?}", self.pheromone);
         }
+        #[cfg(not(release))]
         println!("ACO epoch = {}", epoch);
         best_state.state
     }

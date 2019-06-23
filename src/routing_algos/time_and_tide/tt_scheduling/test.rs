@@ -71,14 +71,15 @@ fn test_online_schedule() {
 
     schedule_fixed_og(&ft, &mut gcl, |_, info| info.clone()).unwrap();
     //schedule_online(&ft, &ft, &mut gcl, |_, info| info);
-    let ans: Vec<u32> = vec![0, 1, 2, 3, 4,
-        150, 151, 152,
-        203, 204,
-        300, 301, 302,
-        403, 404, 450,
-        451, 452];
-    let start_times: Vec<_> = gcl.get_gate_events(2).iter().map(|(t, ..)| *t).collect();
-    assert_eq!(start_times, ans);
+    let ans: Vec<(u32, u32)> = vec![
+        (0, 5),
+        (150, 3),
+        (203, 2),
+        (300, 3),
+        (403, 2),
+        (450, 3)
+    ];
+    assert_eq!(gcl.get_gate_events(2), &ans);
     //panic!("{:?}", gcl.get_gate_events(7));
     //panic!("{:?}", gcl.get_gate_events(6));
 }

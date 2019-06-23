@@ -34,11 +34,13 @@ pub struct GCL {
     gate_evt: Vec<Vec<(u32, u32, u8, usize)>>,
     queue_occupy_evt: Vec<[Vec<(u32, u32, usize)>; MAX_QUEUE as usize]>,
     queue_map: HashMap<(usize, usize), u8>,
+    gate_evt_lookup: Vec<Option<Vec<(u32, u32)>>>
 }
 impl GCL {
     pub fn new(hyper_p: u32, edge_count: usize) -> Self {
         GCL {
             gate_evt: vec![vec![]; edge_count],
+            gate_evt_lookup: vec![None; edge_count],
             queue_occupy_evt: vec![Default::default(); edge_count],
             queue_map: HashMap::new(),
             hyper_p
@@ -55,15 +57,37 @@ impl GCL {
         self.hyper_p
     }
     /// 回傳 `link_id` 上所有閘門關閉事件。
-    /// * `回傳值` - 一個陣列，其內容為 (事件開始時間, 事件持續時間, 閘門編號, 資料流編號);
-    pub fn get_gate_events(&self, link_id: usize) -> &Vec<(u32, u32, u8, usize)> {
-        // TODO 用另一個陣列存一個查找表，把首尾相接的閘門事件串起來
+    /// * `回傳值` - 一個陣列，其內容為 (事件開始時間, 事件持續時間);
+    pub fn get_gate_events(&self, link_id: usize) -> &Vec<(u32, u32)> {
         assert!(self.gate_evt.len() > link_id, "GCL: 指定了超出範圍的邊");
-        return &self.gate_evt[link_id];
+        if self.gate_evt_lookup[link_id].is_none() {
+            // 生成快速查找表
+            let mut lookup = Vec::<(u32, u32)>::new();
+            let len = self.gate_evt[link_id].len();
+            if len > 0 {
+                let first_evt = self.gate_evt[link_id][0];
+                let mut cur_evt = (first_evt.0, first_evt.1);
+                for &(start, duration, ..) in self.gate_evt[link_id][1..len].iter() {
+                    if cur_evt.0 + cur_evt.1 == start { // 首尾相接
+                        cur_evt.1 += duration; // 把閘門事件延長
+                    } else {
+                        lookup.push(cur_evt);
+                        cur_evt = (start, duration);
+                    }
+                }
+                lookup.push(cur_evt);
+            }
+            unsafe { // NOTE 內部可變，因為這只是加速用的
+                let _self = self as *const Self as *mut Self;
+                (*_self).gate_evt_lookup[link_id] = Some(lookup);
+            }
+        }
+        self.gate_evt_lookup[link_id].as_ref().unwrap()
     }
     pub fn insert_gate_evt(&mut self, link_id: usize, flow_id: usize,
         queue_id: u8, start_time: u32, duration: u32
     ) {
+        self.gate_evt_lookup[link_id] = None;
         let entry = (start_time, duration, queue_id, flow_id);
         let evts = &mut self.gate_evt[link_id];
         match evts.binary_search(&entry) {
@@ -139,6 +163,7 @@ impl GCL {
     }
     pub fn delete_flow(&mut self, links: &Vec<usize>, flow_id: usize) {
         for &link_id in links.iter() {
+            self.gate_evt_lookup[link_id] = None;
             let gate_evt = &mut self.gate_evt[link_id];
             let mut i = 0;
             while i < gate_evt.len() {
