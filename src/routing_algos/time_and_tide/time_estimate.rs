@@ -3,7 +3,7 @@ use super::super::{Flow, StreamAwareGraph, GCL, FlowTable, AVBType};
 /// AVB 資料流最多可以佔用的資源百分比（模擬 Credit Base Shaper 的效果）
 const MAX_AVB_SETTING: f64 = 0.75;
 /// BE 資料流最多可以多大
-const MAX_BE_SIZE: f64 = 1522.0;
+const MAX_BE_SIZE: f64 = 1500.0;
 
 /// 計算 AVB 資料流的端對端延遲（包含 TT、BE 及其它 AVB 所造成的延遲）
 /// * `g` - 全局的網路拓撲
@@ -64,7 +64,7 @@ fn tt_interfere_avb_single_link(link_id: usize, wcd: f64, gcl: &GCL) -> u32 {
                 break;
             }
             let gce_ptr_next = all_gce[j];
-            rem -= (gce_ptr_next.0 - (gce_ptr.0 + gce_ptr.1)) as i32;
+            rem -= (gce_ptr_next.0 as i32 - (gce_ptr.0 + gce_ptr.1) as i32);
         }
         i_max = std::cmp::max(i_max, i_cur);
     }

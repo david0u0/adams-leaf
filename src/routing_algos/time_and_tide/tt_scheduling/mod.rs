@@ -86,7 +86,7 @@ pub fn schedule_fixed_og<T: Clone, F: Fn(&Flow, &T) -> Links>(
     for flow_id in tt_flows.into_iter() {
         let flow = changed_table.get_flow(flow_id);
         let links = get_links(flow, changed_table.get_info(flow_id));
-        let mut all_offsets: Vec<Vec<f64>> = vec![];
+        let mut all_offsets: Vec<Vec<u32>> = vec![];
         // NOTE 一個資料流的每個封包，在單一埠口上必需採用同一個佇列
         let mut ro: Vec<u8> = vec![0; links.len()];
         let k = get_frame_cnt(*flow.size());
@@ -102,11 +102,12 @@ pub fn schedule_fixed_og<T: Clone, F: Fn(&Flow, &T) -> Links>(
                 assign_new_queues(&mut ro)?;
             }
         }
+
         // 把上面算好的結果塞進 GCL
         for i in 0..links.len() {
             let link_id = links[i].0;
             let queue_id = ro[i];
-            let trans_time = ((MTU as f64) / links[i].1) as u32;
+            let trans_time = ((MTU as f64) / links[i].1).ceil() as u32;
             gcl.set_queueid(queue_id, link_id, flow_id);
             // 考慮 hyper period 中每個狀況
             let p = *flow.period() as usize;
@@ -117,16 +118,17 @@ pub fn schedule_fixed_og<T: Clone, F: Fn(&Flow, &T) -> Links>(
                         link_id,
                         flow_id,
                         queue_id,
-                        time_shift + all_offsets[m][i] as u32, 
+                        time_shift + all_offsets[m][i],
                         trans_time);
                     // insert queue evt
                     let queue_evt_start = if i == 0 {
                         flow.offset()
                     } else {
-                        let prev_trans_time = MTU as f64/ links[i-1].1;
-                        (all_offsets[m][i-1] + prev_trans_time) as u32
+                        all_offsets[m][i-1] // 前一個埠口一開始傳即視為開始佔用
                     };
-                    let queue_evt_duration = all_offsets[m][i] as u32 - queue_evt_start;
+                    /*println!("===link={} flow={} queue={} {} {}===",
+                        link_id, flow_id , queue_id, all_offsets[m][i], queue_evt_start); */
+                    let queue_evt_duration = all_offsets[m][i] - queue_evt_start;
                     gcl.insert_queue_evt(
                         link_id,
                         flow_id,
@@ -142,23 +144,23 @@ pub fn schedule_fixed_og<T: Clone, F: Fn(&Flow, &T) -> Links>(
 }
 
 /// 回傳值為為一個陣列，若其長度小於路徑長，代表排一排爆開
-fn calculate_offsets(flow: &Flow, all_offsets: &Vec<Vec<f64>>,
+fn calculate_offsets(flow: &Flow, all_offsets: &Vec<Vec<u32>>,
     links: &Vec<(usize, f64)>, ro: &Vec<u8>, gcl: &GCL
-) -> Vec<f64> {
-    let mut offsets = Vec::<f64>::with_capacity(links.len());
+) -> Vec<u32> {
+    let mut offsets = Vec::<u32>::with_capacity(links.len());
     let hyper_p = gcl.get_hyper_p();
     for i in 0..links.len() {
-        let trans_time = MTU as f64 / links[i].1;
+        let trans_time = (MTU as f64 / links[i].1).ceil() as u32;
         let arrive_time = if i == 0 { // 路徑起始
             if all_offsets.len() == 0 { // 資料流的第一個封包
-                flow.offset() as f64
+                flow.offset()
             } else {
                 // #m-1 封包完整送出，且經過處理時間
                 all_offsets[all_offsets.len()-1][i] + trans_time
             }
         } else {
             // #m 封包送達，且經過處理時間
-            let a = offsets[i-1] + MTU as f64 / links[i-1].1;
+            let a = offsets[i-1] + (MTU as f64 / links[i-1].1).ceil() as u32;
             if all_offsets.len() == 0 {
                 a
             } else {
@@ -180,11 +182,11 @@ fn calculate_offsets(flow: &Flow, all_offsets: &Vec<Vec<f64>>,
                 // NOTE 確認沒有其它封包在這個連線上傳輸
                 let option = gcl.get_next_empty_time(
                     links[i].0,
-                    time_shift + cur_offset as u32,
-                    trans_time as u32
+                    time_shift + cur_offset,
+                    trans_time
                 );
                 if let Some(time) = option {
-                    cur_offset = (time - time_shift) as f64;
+                    cur_offset = time - time_shift;
                     if miss_deadline(cur_offset, trans_time, flow) {
                         return offsets;
                     }
@@ -195,15 +197,18 @@ fn calculate_offsets(flow: &Flow, all_offsets: &Vec<Vec<f64>>,
                     let option = gcl.get_next_queue_empty_time(
                         links[i+1].0,
                         ro[i],
-                        time_shift + (cur_offset + trans_time) as u32
+                        time_shift + (cur_offset + trans_time)
                     );
                     if let Some(time) = option {
-                        cur_offset = (time - time_shift) as f64;
+                        cur_offset = time - time_shift;
                         if miss_deadline(cur_offset, trans_time, flow) {
                             return offsets;
                         }
                         continue;
                     }
+                }
+                if miss_deadline(cur_offset, trans_time, flow) {
+                    return offsets;
                 }
                 break;
             }
@@ -227,8 +232,8 @@ fn assign_new_queues(ro: &mut Vec<u8>) -> Result<(), ()> {
 }
 
 #[inline(always)]
-fn miss_deadline(cur_offset: f64, trans_time: f64, flow: &Flow) -> bool {
-    if cur_offset + trans_time >= (flow.offset() + *flow.max_delay()) as f64 {
+fn miss_deadline(cur_offset: u32, trans_time: u32, flow: &Flow) -> bool {
+    if cur_offset + trans_time >= flow.offset() + *flow.max_delay() {
         // 死線爆炸！
         true
     } else {

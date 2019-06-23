@@ -2,7 +2,10 @@ use crate::MAX_K;
 use crate::util::aco::ACO;
 use super::{FlowTable, AdamsAnt, compute_avb_cost, compute_all_avb_cost, schedule_online};
 
-const W1: f64 = 1000.0;
+const TT_AFFINITY: f64 = 100.0; // 計算能見度時，TT 對舊路徑的
+const AVB_AFFINITY: f64 = 10.0; // 計算能見度時，AVB 對舊路徑的
+
+const W1: f64 = 100.0;
 const W2: f64 = 1.0;
 
 pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128, changed: FlowTable<usize>) {
@@ -39,7 +42,7 @@ fn compute_visibility(algo: &AdamsAnt, changed: FlowTable<usize>) -> Vec<[f64; M
             vis[id][i] = 1.0 / algo.compute_avb_cost(flow, Some(i));
         }
         if !changed.check_flow_exist(id) { // 是舊資料流，調高本來路徑的能見度
-            vis[id][route_k] *= 10.0; // TODO 此處需調參
+            vis[id][route_k] *= AVB_AFFINITY;
         }
     });
     algo.flow_table.foreach(false, |flow, &route_k| {
@@ -48,7 +51,7 @@ fn compute_visibility(algo: &AdamsAnt, changed: FlowTable<usize>) -> Vec<[f64; M
             vis[id][i] = 1.0 / algo.get_kth_route(id, route_k).len() as f64;
         }
         if !changed.check_flow_exist(id) { // 是舊資料流，調高本來路徑的能見度
-            vis[id][route_k] *= 100.0; // TODO 此處需調參
+            vis[id][route_k] *= TT_AFFINITY;
         }
     });
     vis
@@ -64,7 +67,6 @@ unsafe fn compute_aco_dist(algo: &mut AdamsAnt, state: &Vec<usize>) -> f64 {
             let old_route_k = *table.get_info(id);
             if old_route_k != route_k {
                 // 資料流存在，且在蟻群算法途中發生改變
-                // 
                 if table.get_flow(id).is_tt() {
                     let links = algo.get_kth_route(id, old_route_k);
                     gcl.delete_flow(links, id);
@@ -97,8 +99,10 @@ unsafe fn compute_aco_dist(algo: &mut AdamsAnt, state: &Vec<usize>) -> f64 {
     let cost2 = compute_all_avb_cost(algo, &table, &gcl) / algo.avb_count as f64;
 
     let cost = W1 * cost1 + W2 * cost2;
+
     #[cfg(not(release))]
     println!("{:?} {}", state, cost * algo.avb_count as f64);
+
     let base: f64 = 10.0;
     base.powf(cost - 1.0)
     //cost * cost

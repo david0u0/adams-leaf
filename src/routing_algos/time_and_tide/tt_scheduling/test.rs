@@ -57,12 +57,12 @@ fn simple_calculate_offset() {
     let flow = ft.get_flow(0);
     let links = ft.get_info(0);
     let a = calculate_offsets(&flow, &vec![], links, &vec![0; 2], &gcl);
-    assert_eq!(vec![0.0, 1.0], a);
+    assert_eq!(vec![0, 1], a);
 
     let flow = ft.get_flow(2);
     let links = ft.get_info(2);
     let a = calculate_offsets(&flow, &vec![], links, &vec![0; 3], &gcl);
-    assert_eq!(vec![0.0, 1.0, 2.0], a);
+    assert_eq!(vec![0, 1, 2], a);
 }
 #[test]
 fn test_online_schedule() {

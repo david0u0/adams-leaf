@@ -86,7 +86,8 @@ impl <'a> RoutingAlgo for AdamsAnt<'a> {
         // TT 排程
         let _self = self as *const Self;
         unsafe {
-            (*_self).schedule_online(&mut self.gcl, &mut self.flow_table, &table_changed).unwrap();
+            (*_self).schedule_online(&mut self.gcl,
+                &mut self.flow_table, &table_changed).expect("TT走最短路徑無法排程");
         }
 
         do_aco(self, T_LIMIT - time.elapsed().as_micros(), table_changed);

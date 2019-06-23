@@ -1,0 +1,30 @@
+{
+    "tt_flows": [
+        {
+            "src": 0,
+            "dst": 11,
+            "size": 45000,
+            "period": 200,
+            "max_delay": 90,
+            "offset": 0
+        },
+        {
+            "src": 5,
+            "dst": 8,
+            "size": 1500,
+            "period": 250,
+            "max_delay": 250,
+            "offset": 0
+        }
+    ],
+    "avb_flows": [
+        {
+            "src": 0,
+            "dst": 8,
+            "size": 400,
+            "period": 125,
+            "max_delay": 1000,
+            "avb_type": "A"
+        }
+    ]
+}
