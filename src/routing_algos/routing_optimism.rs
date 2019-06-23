@@ -151,6 +151,7 @@ impl <'a> RO<'a> {
                     self.save_flowid_on_edge(true, target_flow, new_route);
                     (*_s).flow_table.update_info(target_id, new_route);
                 }
+
                 self.compute_all_avb_cost()
             };
             if cost < min_cost {
@@ -226,5 +227,19 @@ impl <'a> RoutingAlgo for RO<'a> {
         let k = *self.flow_table.get_info(id);
         let flow = self.flow_table.get_flow(id);
         self.get_kth_route(flow, k)
+    }
+    fn show_results(&self) {
+        println!("TT Flows:");
+        self.flow_table.foreach(false, |flow, &route_k| {
+            let route = self.get_kth_route(flow, route_k);
+            println!("flow id = {}, {} route = {:?}", *flow.id(), route_k, route);
+        });
+        println!("AVB Flows:");
+        self.flow_table.foreach(true, |flow, &route_k| {
+            let route = self.get_kth_route(flow, route_k);
+            let cost = self.compute_avb_cost(flow, Some(route_k));
+            println!("flow id = {}, route = {:?} cost = {}", *flow.id(), route, cost);
+        });
+        println!("total avb cost = {}", self.compute_all_avb_cost());
     }
 }

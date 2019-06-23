@@ -99,6 +99,7 @@ pub trait RoutingAlgo {
     fn del_flows(&mut self, flows: Vec<Flow>);
     fn get_retouted_flows(&self) -> &Vec<usize>;
     fn get_route(&self, id: usize) -> &Vec<usize>;
+    fn show_results(&self);
 }
 
 mod stream_aware_graph;

@@ -226,7 +226,7 @@ impl StreamAwareGraph {
     /// __注意：此處兩個方向不視為同個邊！__
     /// * `remember` - 布林值，記憶或是遺忘路徑
     /// * `flow_id` - 要記憶或遺忘的資料流ID
-    /// * `route` - 該路徑
+    /// * `route` - 該路徑(以節點組成)
     pub fn save_flowid_on_edge(&mut self, remember: bool, flow_id: usize, route: &Vec<usize>) {
         for i in 0..route.len()-1 {
             let (_, set, _) = self.edge_info.get_mut(&(route[i], route[i+1])).unwrap();

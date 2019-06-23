@@ -5,11 +5,11 @@ use crate::MAX_K;
 
 const R: usize = 60;
 const L: usize = 20;
-const TAO0: f64 = 10.0;
+const TAO0: f64 = 25.0;
 const RHO: f64 = 0.5; // 蒸發率
 const Q0: f64 = 0.4;
-const MAX_PH: f64 = 20.0;
-const MIN_PH: f64 = 0.05;
+const MAX_PH: f64 = 50.0;
+const MIN_PH: f64 = 1.0;
 
 pub enum ACOArgsF64 {
     Tao0, Rho, Q0, MaxPh, MinPh
@@ -126,10 +126,10 @@ impl ACO {
     }
     pub fn do_aco<F>(&mut self, time_limit: u128,
         visibility: &Vec<[f64; MAX_K]>,
-        mut calculate_dist: F, cur_dist: f64
-    ) -> Option<State> where F: FnMut(&State) -> f64 {
+        mut calculate_dist: F
+    ) -> State where F: FnMut(&State) -> f64 {
         let time = std::time::Instant::now();
-        let mut best_state = WeightedState::new(cur_dist, None);
+        let mut best_state = WeightedState::new(std::f64::MAX, None);
         let mut epoch = 0;
         while time.elapsed().as_micros() < time_limit {
             epoch += 1;
@@ -142,7 +142,7 @@ impl ACO {
         }
         #[cfg(not(release))]
         println!("ACO epoch = {}", epoch);
-        best_state.state
+        best_state.state.unwrap()
     }
     fn do_single_epoch<F>(&mut self, visibility: &Vec<[f64; MAX_K]>,
         calculate_dist: &mut F) -> WeightedState

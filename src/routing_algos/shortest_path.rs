@@ -38,4 +38,7 @@ impl <'a> RoutingAlgo for SPF<'a> {
     fn get_route(&self, id: usize) -> &Vec<usize> {
         return self.flow_table.get_info(id);
     }
+    fn show_results(&self) {
+        unimplemented!();
+    }
 }

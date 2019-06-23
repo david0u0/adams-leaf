@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use crate::util::YensAlgo;
 use crate::network_struct::Graph;
 use crate::util::aco::ACO;
@@ -14,7 +12,7 @@ use aco_routing::do_aco;
 
 type FT = FlowTable<usize>;
 const K: usize = 20;
-const T_LIMIT: u128 = 100 * 1000;
+const T_LIMIT: u128 = 10 * 1000;
 
 pub struct AdamsAnt<'a> {
     aco: ACO,
@@ -67,14 +65,13 @@ impl <'a> AdamsAnt<'a> {
 
 impl <'a> RoutingAlgo for AdamsAnt<'a> {
     fn add_flows(&mut self, flows: Vec<Flow>) {
-        let time = Instant::now();
         let mut max_id = 0;
         self.flow_table.insert(flows.clone(), 0);
-        let mut table_changed = self.flow_table.clone_into_changed_table();
+        let mut reconf = self.flow_table.clone_into_changed_table();
         for flow in flows.iter() {
             max_id = std::cmp::max(max_id, *flow.id());
             self.yens_algo.compute_routes(*flow.src(), *flow.dst());
-            table_changed.update_info(*flow.id(), 0);
+            reconf.update_info(*flow.id(), 0);
             if flow.is_avb() {
                 self.avb_count += 1;
             } else {
@@ -83,14 +80,7 @@ impl <'a> RoutingAlgo for AdamsAnt<'a> {
         }
         self.aco.extend_state_len(max_id + 1);
 
-        // TT 排程
-        let _self = self as *const Self;
-        unsafe {
-            (*_self).schedule_online(&mut self.gcl,
-                &mut self.flow_table, &table_changed).expect("TT走最短路徑無法排程");
-        }
-
-        do_aco(self, T_LIMIT - time.elapsed().as_micros(), table_changed);
+        do_aco(self, T_LIMIT, reconf);
         self.g.forget_all_flows();
         self.flow_table.foreach(true, |flow, r| {
             unsafe { self.save_flowid_on_edge(true, *flow.id(), *r) }
@@ -105,6 +95,20 @@ impl <'a> RoutingAlgo for AdamsAnt<'a> {
     fn get_route(&self, id: usize) -> &Vec<usize> {
         let k = *self.flow_table.get_info(id);
         self.get_kth_route(id, k)
+    }
+    fn show_results(&self) {
+        println!("TT Flows:");
+        self.flow_table.foreach(false, |flow, &route_k| {
+            let route = self.get_kth_route(*flow.id(), route_k);
+            println!("flow id = {}, route = {:?}", *flow.id(), route);
+        });
+        println!("AVB Flows:");
+        self.flow_table.foreach(true, |flow, &route_k| {
+            let route = self.get_kth_route(*flow.id(), route_k);
+            let cost = self.compute_avb_cost(flow, Some(route_k));
+            println!("flow id = {}, route = {:?} cost = {}", *flow.id(), route, cost);
+        });
+        println!("total avb cost = {}", self.compute_all_avb_cost());
     }
 }
 

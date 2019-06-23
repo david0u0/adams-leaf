@@ -17,6 +17,7 @@ pub fn compute_avb_latency<T: Clone>(g: &StreamAwareGraph, flow: &Flow,
         let overlap_flow_id = g.get_overlap_flows(route);
         let mut end_to_end_lanency = 0.0;
         for (i, (link_id, bandwidth)) in g.get_links_id_bandwidth(route).into_iter().enumerate() {
+
             let wcd = wcd_on_single_link(*id, *size, *avb_type,
                 bandwidth, flow_table, &overlap_flow_id[i]);
             end_to_end_lanency += wcd + tt_interfere_avb_single_link(

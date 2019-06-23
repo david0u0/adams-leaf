@@ -21,12 +21,12 @@ fn main() -> Result<(), String> {
     // FIXME 對這個圖作 Yens algo，0->2這條路有時找得到6條，有時只找得到5條
 
     let mut algo = AdamsAnt::new(&g, None, None);
-    //let mut algo = RO::new(&g, None, None);
+    // let mut algo = RO::new(&g, None, None);
 
     algo.add_flows(flows.clone());
     //algo.add_flows(flows2.clone());
 
-    println!("sum = {}", algo.compute_all_avb_cost());
+    algo.show_results();
 
     return Ok(());
 }
