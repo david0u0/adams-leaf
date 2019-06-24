@@ -4,8 +4,8 @@ use crate::util::aco::ACO;
 use crate::MAX_K;
 use super::{FlowTable, AdamsAnt, compute_avb_cost, compute_all_avb_cost, schedule_online};
 
-const TT_AFFINITY: f64 = 10.0; // 計算能見度時，TT 對舊路徑的偏好程度
-const AVB_AFFINITY: f64 = 5.0; // 計算能見度時，AVB 對舊路徑的偏好程度
+const TT_AFFINITY: f64 = 5.0; // 計算能見度時，TT 對舊路徑的偏好程度
+const AVB_AFFINITY: f64 = 3.0; // 計算能見度時，AVB 對舊路徑的偏好程度
 
 const W1: f64 = 10.0;
 const W2: f64 = 1.0;
