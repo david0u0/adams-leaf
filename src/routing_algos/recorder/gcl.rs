@@ -94,12 +94,15 @@ impl GCL {
         let entry = (start_time, duration, queue_id, flow_id);
         let evts = &mut self.gate_evt[link_id];
         match evts.binary_search(&entry) {
-            Ok(_) => {
-                // TODO 還有更多可能的錯誤
-                println!("{} {:?}", link_id, self.get_gate_events(link_id));
-                panic!("插入重複的閘門事件 {:?}", entry)
-            },
-            Err(pos) => evts.insert(pos, entry)
+            Ok(_) => panic!("插入重複的閘門事件: link={}, {:?}", link_id, entry),
+            Err(pos) => {
+                if pos > 0 && evts[pos-1].0 + evts[pos-1].1 > start_time {
+                    // 開始時間位於前一個事件中
+                    panic!("插入重疊的閘門事件： link={}, {:?} v.s. {:?}", link_id, evts[pos-1], entry);
+                } else {
+                    evts.insert(pos, entry)
+                }
+            }
         }
     }
     pub fn insert_queue_evt(&mut self, link_id: usize, flow_id: usize,
@@ -111,8 +114,7 @@ impl GCL {
         let entry = (start_time, duration, flow_id);
         let evts = &mut self.queue_occupy_evt[link_id][queue_id as usize];
         match evts.binary_search(&entry) {
-            Ok(_) => panic!("插入重複的佇列事件: link={}, queue={}, {:?}",
-                link_id, queue_id, entry), // TODO 還有更多可能的錯誤
+            Ok(_) => panic!("插入重複的佇列事件: link={}, queue={}, {:?}", link_id, queue_id, entry),
             Err(pos) => {
                 if pos > 0 && evts[pos-1].0 + evts[pos-1].1 >= start_time {
                     // 開始時間位於前一個事件中，則延伸前一個事件
@@ -182,6 +184,7 @@ impl GCL {
             self.gate_evt_lookup[link_id] = None;
             let gate_evt = &mut self.gate_evt[link_id];
             let mut i = 0;
+            self.queue_map.remove(&(link_id, flow_id));
             while i < gate_evt.len() {
                 if gate_evt[i].3 == flow_id {
                     gate_evt.remove(i);
