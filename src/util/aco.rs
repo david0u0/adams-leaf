@@ -88,6 +88,11 @@ fn select_cluster(visibility: &[f64; MAX_K], pheromone: &[f64; MAX_K], k: usize,
     }
 }
 
+pub enum ShouldStopACO {
+    Yes(f64),
+    No(f64),
+}
+
 pub struct ACO {
     pheromone: Vec<[f64; MAX_K]>,
     k: usize,
@@ -143,16 +148,20 @@ impl ACO {
         mut calculate_dist: F,
     ) -> State
     where
-        F: FnMut(&State) -> f64,
+        F: FnMut(&State) -> ShouldStopACO,
     {
         let time = std::time::Instant::now();
         let mut best_state = WeightedState::new(std::f64::MAX, None);
         let mut epoch = 0;
         while time.elapsed().as_micros() < time_limit {
             epoch += 1;
-            let local_best_state = self.do_single_epoch(&visibility, &mut calculate_dist);
+            let (should_stop, local_best_state) =
+                self.do_single_epoch(&visibility, &mut calculate_dist);
             if local_best_state.get_dist() < best_state.get_dist() {
                 best_state = local_best_state;
+            }
+            if should_stop {
+                break;
             }
             #[cfg(debug_assertions)]
             println!("{:?}", self.pheromone);
@@ -165,12 +174,13 @@ impl ACO {
         &mut self,
         visibility: &Vec<[f64; MAX_K]>,
         calculate_dist: &mut F,
-    ) -> WeightedState
+    ) -> (bool, WeightedState)
     where
-        F: FnMut(&State) -> f64,
+        F: FnMut(&State) -> ShouldStopACO,
     {
         let mut max_heap: BinaryHeap<WeightedState> = BinaryHeap::new();
         let state_len = self.get_state_len();
+        let mut should_stop = false;
         for _ in 0..self.r {
             let mut cur_state = Vec::<usize>::with_capacity(state_len);
             for i in 0..state_len {
@@ -178,11 +188,19 @@ impl ACO {
                 cur_state.push(next);
                 // TODO online pharamon update
             }
-            let dist = calculate_dist(&cur_state);
-            max_heap.push(WeightedState::new(dist, Some(cur_state)));
+            match calculate_dist(&cur_state) {
+                ShouldStopACO::No(dist) => {
+                    max_heap.push(WeightedState::new(dist, Some(cur_state)));
+                }
+                ShouldStopACO::Yes(dist) => {
+                    max_heap.push(WeightedState::new(dist, Some(cur_state)));
+                    should_stop = true;
+                    break;
+                }
+            }
         }
         self.evaporate();
-        self.offline_update(max_heap)
+        (should_stop, self.offline_update(max_heap))
     }
     fn evaporate(&mut self) {
         let state_len = self.get_state_len();
@@ -200,8 +218,11 @@ impl ACO {
         let best_state = max_heap.pop().unwrap();
         self.update_pheromon(&best_state);
         for _ in 0..self.l - 1 {
-            let w_state = max_heap.pop().unwrap();
-            self.update_pheromon(&w_state);
+            if let Some(w_state) = max_heap.pop() {
+                self.update_pheromon(&w_state);
+            } else {
+                break;
+            }
         }
         best_state
     }
@@ -256,7 +277,7 @@ mod test {
                     cost -= s as f64;
                 }
             }
-            cost / 6.0
+            ShouldStopACO::No(cost / 6.0)
         });
         assert_eq!(vec![0, 1, 0, 1, 0, 1, 0, 1, 0, 1], new_state);
     }

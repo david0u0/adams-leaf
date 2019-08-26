@@ -29,6 +29,9 @@ impl<'a> SPF<'a> {
 }
 
 impl<'a> RoutingAlgo for SPF<'a> {
+    fn get_last_compute_time(&self) -> u128 {
+        unimplemented!();
+    }
     fn add_flows(&mut self, flows: Vec<Flow>) {
         self.flow_table.insert(flows.clone(), vec![]);
         let mut tt_changed = self.flow_table.clone_into_changed_table();

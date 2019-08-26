@@ -1,7 +1,7 @@
 use std::time::Instant;
 
-use super::{compute_all_avb_cost, compute_avb_cost, schedule_online, AdamsAnt, FlowTable};
-use crate::util::aco::ACO;
+use super::{compute_all_avb_cost, AVBCostResult, AdamsAnt, FlowTable};
+use crate::util::aco::{ShouldStopACO, ACO};
 use crate::MAX_K;
 
 const TT_AFFINITY: f64 = 5.0; // 計算能見度時，TT 對舊路徑的偏好程度
@@ -31,7 +31,12 @@ pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128, reconf: FlowTable<usize>) {
     let mut best_dist = std::f64::MAX;
     let new_state = unsafe {
         (*aco).do_aco(time_limit - time.elapsed().as_micros(), &vis, |state| {
-            compute_aco_dist(algo, state, &mut best_dist)
+            let res = compute_aco_dist(algo, state, &mut best_dist);
+            if res.0 == 0 {
+                ShouldStopACO::Yes(res.1)
+            } else {
+                ShouldStopACO::No(res.1)
+            }
         })
     };
 }
@@ -45,7 +50,7 @@ fn compute_visibility(algo: &AdamsAnt, reconf: &FlowTable<usize>) -> Vec<[f64; M
     algo.flow_table.foreach(true, |flow, &route_k| {
         let id = *flow.id();
         for i in 0..algo.get_candidate_count(flow) {
-            vis[id][i] = 1.0 / algo.compute_avb_cost(flow, Some(i)).powf(2.0);
+            vis[id][i] = 1.0 / algo.compute_avb_cost(flow, Some(i)).1.powf(2.0);
         }
         if !reconf.check_flow_exist(id) {
             // 是舊資料流，調高本來路徑的能見度
@@ -66,7 +71,11 @@ fn compute_visibility(algo: &AdamsAnt, reconf: &FlowTable<usize>) -> Vec<[f64; M
 }
 
 /// 本函式不只會計算距離，如果看見最佳解，還會把該解的 FlowTable 和 GCL 記錄下來
-unsafe fn compute_aco_dist(algo: &mut AdamsAnt, state: &Vec<usize>, best_dist: &mut f64) -> f64 {
+unsafe fn compute_aco_dist(
+    algo: &mut AdamsAnt,
+    state: &Vec<usize>,
+    best_dist: &mut f64,
+) -> AVBCostResult {
     let mut table = algo.flow_table.clone();
     let mut tt_changed_table = table.clone_into_changed_table();
     let mut gcl = algo.gcl.clone();
@@ -92,7 +101,7 @@ unsafe fn compute_aco_dist(algo: &mut AdamsAnt, state: &Vec<usize>, best_dist: &
     }
     let result = algo.schedule_online(&mut gcl, &mut table, &tt_changed_table);
     if result.is_err() {
-        return std::f64::MAX;
+        return (0, std::f64::MAX);
     }
     let cost1 = if result.unwrap() { 1.0 } else { 0.0 };
 
@@ -114,7 +123,8 @@ unsafe fn compute_aco_dist(algo: &mut AdamsAnt, state: &Vec<usize>, best_dist: &
             }
         }
     }
-    let cost2 = compute_all_avb_cost(algo, &table, &gcl) / algo.avb_count as f64;
+    let avb_cost_res = compute_all_avb_cost(algo, &table, &gcl);
+    let cost2 = avb_cost_res.1 / algo.avb_count as f64;
 
     let cost = W1 * cost1 + W2 * cost2;
 
@@ -130,5 +140,5 @@ unsafe fn compute_aco_dist(algo: &mut AdamsAnt, state: &Vec<usize>, best_dist: &
         algo.gcl = gcl;
         algo.flow_table = table;
     }
-    dist
+    avb_cost_res
 }

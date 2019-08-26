@@ -3,6 +3,8 @@ use super::{AdamsAnt, Flow, FlowTable, GCL};
 
 type FT = FlowTable<usize>;
 
+pub type AVBCostResult = (u32, f64);
+
 const C1_EXCEED: f64 = 100.0;
 const W1: f64 = 1.0;
 const W2: f64 = 1.0;
@@ -14,7 +16,7 @@ pub fn compute_avb_cost(
     k: Option<usize>,
     table: &FT,
     gcl: &GCL,
-) -> f64 {
+) -> AVBCostResult {
     let k = match k {
         Some(t) => t,
         None => *table.get_info(*flow.id()),
@@ -25,25 +27,20 @@ pub fn compute_avb_cost(
     let c1 = if latency > max_delay { C1_EXCEED } else { 0.0 };
     let c2 = latency as f64 / max_delay as f64;
     let c3 = 0.0; // TODO 計算 c3
-    W1 * c1 + W2 * c2 + W3 * c3
-}
-
-pub fn compute_all_avb_cost(algo: &AdamsAnt, table: &FT, gcl: &GCL) -> f64 {
-    let mut sum = 0.0;
-    table.foreach(true, |flow, &k| {
-        sum += compute_avb_cost(algo, flow, Some(k), table, gcl);
-    });
-    sum
-}
-
-pub fn find_min_cost_route(algo: &AdamsAnt, flow: &Flow, table: &FT, gcl: &GCL) -> usize {
-    let (mut min_cost, mut best_k) = (std::f64::MAX, 0);
-    for k in 0..algo.get_candidate_count(flow) {
-        let cost = compute_avb_cost(algo, flow, Some(k), table, gcl);
-        if cost < min_cost {
-            min_cost = cost;
-            best_k = k;
-        }
+    if c1 > 0.1 {
+        (1, W1 * c1 + W2 * c2 + W3 * c3)
+    } else {
+        (0, W1 * c1 + W2 * c2 + W3 * c3)
     }
-    best_k
+}
+
+pub fn compute_all_avb_cost(algo: &AdamsAnt, table: &FT, gcl: &GCL) -> AVBCostResult {
+    let mut all_cost = 0.0;
+    let mut all_fail_cnt = 0;
+    table.foreach(true, |flow, &k| {
+        let (fail_cnt, cost) = compute_avb_cost(algo, flow, Some(k), table, gcl);
+        all_fail_cnt += fail_cnt;
+        all_cost += cost;
+    });
+    (all_fail_cnt, all_cost)
 }

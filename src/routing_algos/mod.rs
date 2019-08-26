@@ -100,6 +100,7 @@ pub trait RoutingAlgo {
     fn get_retouted_flows(&self) -> &Vec<usize>;
     fn get_route(&self, id: usize) -> &Vec<usize>;
     fn show_results(&self);
+    fn get_last_compute_time(&self) -> u128;
 }
 
 mod stream_aware_graph;

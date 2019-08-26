@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use super::time_and_tide::schedule_online;
 use super::{Flow, FlowTable, RoutingAlgo, StreamAwareGraph, GCL};
 use crate::network_struct::Graph;
@@ -6,7 +8,7 @@ use crate::util::YensAlgo;
 use crate::T_LIMIT;
 
 mod cost_calculate;
-pub(self) use cost_calculate::{compute_all_avb_cost, compute_avb_cost};
+pub(self) use cost_calculate::{compute_all_avb_cost, compute_avb_cost, AVBCostResult};
 
 mod aco_routing;
 use aco_routing::do_aco;
@@ -22,6 +24,7 @@ pub struct AdamsAnt<'a> {
     gcl: GCL,
     avb_count: usize,
     tt_count: usize,
+    compute_time: u128,
 }
 impl<'a> AdamsAnt<'a> {
     pub fn new(g: &'a StreamAwareGraph, flow_table: Option<FT>, gcl: Option<GCL>) -> Self {
@@ -35,6 +38,7 @@ impl<'a> AdamsAnt<'a> {
             yens_algo: YensAlgo::new(g, K),
             avb_count: 0,
             tt_count: 0,
+            compute_time: 0,
         }
     }
     pub fn get_kth_route(&self, flow_id: usize, k: usize) -> &Vec<usize> {
@@ -67,7 +71,9 @@ impl<'a> AdamsAnt<'a> {
 
 impl<'a> RoutingAlgo for AdamsAnt<'a> {
     fn add_flows(&mut self, flows: Vec<Flow>) {
+        let init_time = Instant::now();
         self.add_flows_in_time(flows, T_LIMIT);
+        self.compute_time = init_time.elapsed().as_micros();
     }
     fn del_flows(&mut self, flows: Vec<Flow>) {
         unimplemented!();
@@ -88,7 +94,7 @@ impl<'a> RoutingAlgo for AdamsAnt<'a> {
         println!("AVB Flows:");
         self.flow_table.foreach(true, |flow, &route_k| {
             let route = self.get_kth_route(*flow.id(), route_k);
-            let cost = self.compute_avb_cost(flow, Some(route_k));
+            let cost = self.compute_avb_cost(flow, Some(route_k)).1;
             println!(
                 "flow id = {}, route = {:?} cost = {}",
                 *flow.id(),
@@ -96,15 +102,18 @@ impl<'a> RoutingAlgo for AdamsAnt<'a> {
                 cost
             );
         });
-        println!("total avb cost = {}", self.compute_all_avb_cost());
+        println!("total avb cost = {}", self.compute_all_avb_cost().1);
+    }
+    fn get_last_compute_time(&self) -> u128 {
+        self.compute_time
     }
 }
 
 impl<'a> AdamsAnt<'a> {
-    pub fn compute_avb_cost(&self, flow: &Flow, k: Option<usize>) -> f64 {
+    pub fn compute_avb_cost(&self, flow: &Flow, k: Option<usize>) -> AVBCostResult {
         compute_avb_cost(self, flow, k, &self.flow_table, &self.gcl)
     }
-    pub fn compute_all_avb_cost(&self) -> f64 {
+    pub fn compute_all_avb_cost(&self) -> AVBCostResult {
         compute_all_avb_cost(self, &self.flow_table, &self.gcl)
     }
     pub fn add_flows_in_time(&mut self, flows: Vec<Flow>, t_limit: u128) {

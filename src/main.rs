@@ -29,11 +29,13 @@ fn main() -> Result<(), String> {
         algo.add_flows_in_time(flows.clone(), 1000 * 300);
         algo.add_flows(flows2.clone());
         algo.show_results();
+        println!("compute time = {} micro sec", algo.get_last_compute_time());
     } else if algo_type == "ro" {
         let mut algo = RO::new(&g, None, None);
         algo.add_flows(flows.clone());
         algo.add_flows(flows2.clone());
         algo.show_results();
+        println!("compute time = {} micro sec", algo.get_last_compute_time());
     } else if algo_type == "spf" {
         let mut algo = SPF::new(&g);
         algo.add_flows(flows.clone());
