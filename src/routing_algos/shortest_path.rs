@@ -1,7 +1,7 @@
+use super::time_and_tide::{compute_avb_latency, schedule_online};
+use super::{Flow, FlowTable, RoutingAlgo, StreamAwareGraph, GCL};
 use crate::network_struct::Graph;
 use crate::util::Dijkstra;
-use super::{StreamAwareGraph, FlowTable, Flow, RoutingAlgo, GCL};
-use super::time_and_tide::{schedule_online, compute_avb_latency};
 
 const C1_EXCEED: f64 = 100.0;
 const W1: f64 = 1.0;
@@ -16,7 +16,7 @@ pub struct SPF<'a> {
     rerouted: Vec<usize>,
 }
 
-impl <'a> SPF<'a> {
+impl<'a> SPF<'a> {
     pub fn new(g: &'a StreamAwareGraph) -> Self {
         return SPF {
             g: g.clone(),
@@ -28,7 +28,7 @@ impl <'a> SPF<'a> {
     }
 }
 
-impl <'a> RoutingAlgo for SPF<'a> {
+impl<'a> RoutingAlgo for SPF<'a> {
     fn add_flows(&mut self, flows: Vec<Flow>) {
         self.flow_table.insert(flows.clone(), vec![]);
         let mut tt_changed = self.flow_table.clone_into_changed_table();
@@ -41,12 +41,16 @@ impl <'a> RoutingAlgo for SPF<'a> {
         // TT schedule
         let _self = self as *mut Self;
         unsafe {
-            schedule_online(&mut (*_self).flow_table, &tt_changed, &mut (*_self).gcl,
+            schedule_online(
+                &mut (*_self).flow_table,
+                &tt_changed,
+                &mut (*_self).gcl,
                 |flow, _| {
                     let r = self.get_shortest_route(flow);
                     self.g.get_links_id_bandwidth(&r)
-                }
-            ).unwrap();
+                },
+            )
+            .unwrap();
         }
 
         let _g = &mut self.g as *mut StreamAwareGraph;
@@ -76,12 +80,17 @@ impl <'a> RoutingAlgo for SPF<'a> {
         self.flow_table.foreach(true, |flow, _| {
             let route = self.get_shortest_route(flow);
             let cost = self.compute_avb_cost(flow);
-            println!("flow id = {}, route = {:?} cost = {}", *flow.id(), route, cost);
+            println!(
+                "flow id = {}, route = {:?} cost = {}",
+                *flow.id(),
+                route,
+                cost
+            );
         });
         println!("total avb cost = {}", self.compute_all_avb_cost());
     }
 }
-impl <'a> SPF<'a> {
+impl<'a> SPF<'a> {
     fn get_shortest_route(&self, flow: &Flow) -> Vec<usize> {
         let _dij = &self.dijkstra_algo as *const Dijkstra<usize, StreamAwareGraph>
             as *mut Dijkstra<usize, StreamAwareGraph>;
@@ -90,21 +99,11 @@ impl <'a> SPF<'a> {
     pub fn compute_avb_cost(&self, flow: &Flow) -> f64 {
         let max_delay = *flow.max_delay();
         let route = self.get_shortest_route(flow);
-        let latency = compute_avb_latency(
-            &self.g,
-            flow,
-            &route,
-            &self.flow_table,
-            &self.gcl
-        );
-        let c1 = if latency > max_delay {
-            C1_EXCEED
-        } else {
-            0.0
-        };
+        let latency = compute_avb_latency(&self.g, flow, &route, &self.flow_table, &self.gcl);
+        let c1 = if latency > max_delay { C1_EXCEED } else { 0.0 };
         let c2 = latency as f64 / max_delay as f64;
         let c3 = 0.0; // TODO 計算 c3
-        W1*c1 + W2*c2 + W3*c3
+        W1 * c1 + W2 * c2 + W3 * c3
     }
     pub fn compute_all_avb_cost(&self) -> f64 {
         let mut cost = 0.0;

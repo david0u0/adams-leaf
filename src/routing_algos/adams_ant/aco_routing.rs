@@ -1,8 +1,8 @@
 use std::time::Instant;
 
+use super::{compute_all_avb_cost, compute_avb_cost, schedule_online, AdamsAnt, FlowTable};
 use crate::util::aco::ACO;
 use crate::MAX_K;
-use super::{FlowTable, AdamsAnt, compute_avb_cost, compute_all_avb_cost, schedule_online};
 
 const TT_AFFINITY: f64 = 5.0; // 計算能見度時，TT 對舊路徑的偏好程度
 const AVB_AFFINITY: f64 = 3.0; // 計算能見度時，AVB 對舊路徑的偏好程度
@@ -14,7 +14,7 @@ pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128, reconf: FlowTable<usize>) {
     let time = Instant::now();
     let aco = &mut algo.aco as *mut ACO;
     algo.g.forget_all_flows();
-    algo.flow_table.foreach(true, |flow, &route_k| unsafe{
+    algo.flow_table.foreach(true, |flow, &route_k| unsafe {
         algo.save_flowid_on_edge(true, *flow.id(), route_k);
     });
 
@@ -23,8 +23,9 @@ pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128, reconf: FlowTable<usize>) {
     // TT 排程
     let _self = algo as *const AdamsAnt;
     unsafe {
-        (*_self).schedule_online(&mut algo.gcl,
-            &mut algo.flow_table, &reconf).expect("TT走最短路徑無法排程");
+        (*_self)
+            .schedule_online(&mut algo.gcl, &mut algo.flow_table, &reconf)
+            .expect("TT走最短路徑無法排程");
     }
 
     let mut best_dist = std::f64::MAX;
@@ -46,7 +47,8 @@ fn compute_visibility(algo: &AdamsAnt, reconf: &FlowTable<usize>) -> Vec<[f64; M
         for i in 0..algo.get_candidate_count(flow) {
             vis[id][i] = 1.0 / algo.compute_avb_cost(flow, Some(i)).powf(2.0);
         }
-        if !reconf.check_flow_exist(id) { // 是舊資料流，調高本來路徑的能見度
+        if !reconf.check_flow_exist(id) {
+            // 是舊資料流，調高本來路徑的能見度
             vis[id][route_k] *= AVB_AFFINITY;
         }
     });
@@ -55,7 +57,8 @@ fn compute_visibility(algo: &AdamsAnt, reconf: &FlowTable<usize>) -> Vec<[f64; M
         for i in 0..algo.get_candidate_count(flow) {
             vis[id][i] = 1.0 / algo.get_kth_route(id, route_k).len() as f64;
         }
-        if !reconf.check_flow_exist(id) { // 是舊資料流，調高本來路徑的能見度
+        if !reconf.check_flow_exist(id) {
+            // 是舊資料流，調高本來路徑的能見度
             vis[id][route_k] *= TT_AFFINITY;
         }
     });
@@ -75,8 +78,12 @@ unsafe fn compute_aco_dist(algo: &mut AdamsAnt, state: &Vec<usize>, best_dist: &
                 if old_route_k != route_k {
                     // 資料流存在，且在蟻群算法途中發生改變
                     let route = algo.get_kth_route(id, old_route_k);
-                    let links = algo.g.get_links_id_bandwidth(route).iter()
-                        .map(|(id, _)| *id).collect();
+                    let links = algo
+                        .g
+                        .get_links_id_bandwidth(route)
+                        .iter()
+                        .map(|(id, _)| *id)
+                        .collect();
                     gcl.delete_flow(&links, id);
                     tt_changed_table.update_info(id, route_k);
                 }

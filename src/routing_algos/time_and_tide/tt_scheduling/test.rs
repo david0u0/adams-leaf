@@ -13,7 +13,7 @@ type FT = FlowTable<Info>;
  *     | /
  *     |/
  *     5
- * 
+ *
  * flow0(0->4): route=[0, 1, 4], links = [0, 4]
  * flow1(0->5): route=[0, 3, 5], links = [2, 6]
  * flow2(0->4): route=[0, 3, 5, 4], links = [2, 6, 7]
@@ -25,24 +25,47 @@ fn gen_links(ids: Vec<usize>) -> Info {
 }
 fn gen_flow_table() -> FT {
     let mut ft = FlowTable::new();
-    ft.insert(vec![
-        Flow::TT {
-            id: 0, src: 0, dst: 4, size: MTU,
-            period: 100, max_delay: 100, offset: 0
-        },
-        Flow::TT {
-            id: 1, src: 0, dst: 5, size: MTU*3,
-            period: 150, max_delay: 150, offset: 0
-        },
-        Flow::TT {
-            id: 2, src: 0, dst: 4, size: MTU*2,
-            period: 200, max_delay: 200, offset: 0
-        },
-        Flow::TT {
-            id: 3, src: 0, dst: 4, size: MTU*3,
-            period: 300, max_delay: 300, offset: 0
-        }
-    ], vec![]);
+    ft.insert(
+        vec![
+            Flow::TT {
+                id: 0,
+                src: 0,
+                dst: 4,
+                size: MTU,
+                period: 100,
+                max_delay: 100,
+                offset: 0,
+            },
+            Flow::TT {
+                id: 1,
+                src: 0,
+                dst: 5,
+                size: MTU * 3,
+                period: 150,
+                max_delay: 150,
+                offset: 0,
+            },
+            Flow::TT {
+                id: 2,
+                src: 0,
+                dst: 4,
+                size: MTU * 2,
+                period: 200,
+                max_delay: 200,
+                offset: 0,
+            },
+            Flow::TT {
+                id: 3,
+                src: 0,
+                dst: 4,
+                size: MTU * 3,
+                period: 300,
+                max_delay: 300,
+                offset: 0,
+            },
+        ],
+        vec![],
+    );
     ft.update_info(0, gen_links(vec![0, 4]));
     ft.update_info(1, gen_links(vec![2, 6]));
     ft.update_info(2, gen_links(vec![2, 6, 7]));
@@ -71,14 +94,7 @@ fn test_online_schedule() {
 
     schedule_fixed_og(&ft, &mut gcl, |_, info| info.clone()).unwrap();
     //schedule_online(&ft, &ft, &mut gcl, |_, info| info);
-    let ans: Vec<(u32, u32)> = vec![
-        (0, 5),
-        (150, 3),
-        (203, 2),
-        (300, 3),
-        (403, 2),
-        (450, 3)
-    ];
+    let ans: Vec<(u32, u32)> = vec![(0, 5), (150, 3), (203, 2), (300, 3), (403, 2), (450, 3)];
     assert_eq!(gcl.get_gate_events(2), &ans);
     //panic!("{:?}", gcl.get_gate_events(7));
     //panic!("{:?}", gcl.get_gate_events(6));

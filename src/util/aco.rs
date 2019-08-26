@@ -1,7 +1,7 @@
 extern crate rand;
-use std::collections::BinaryHeap;
-use rand::Rng;
 use crate::MAX_K;
+use rand::Rng;
+use std::collections::BinaryHeap;
 
 const R: usize = 60;
 const L: usize = 20;
@@ -12,21 +12,30 @@ const MAX_PH: f64 = 30.0;
 const MIN_PH: f64 = 1.0;
 
 pub enum ACOArgsF64 {
-    Tao0, Rho, Q0, MaxPh, MinPh
+    Tao0,
+    Rho,
+    Q0,
+    MaxPh,
+    MinPh,
 }
 pub enum ACOArgsUSize {
-    R, L
+    R,
+    L,
 }
 
 type State = Vec<usize>;
 
 #[derive(PartialOrd)]
 struct WeightedState {
-    neg_dist: f64, state: Option<State>
+    neg_dist: f64,
+    state: Option<State>,
 }
 impl WeightedState {
     fn new(dist: f64, state: Option<State>) -> Self {
-        WeightedState { neg_dist: -dist, state }
+        WeightedState {
+            neg_dist: -dist,
+            state,
+        }
     }
     fn get_dist(&self) -> f64 {
         -self.neg_dist
@@ -37,7 +46,7 @@ impl PartialEq for WeightedState {
         return self.neg_dist == other.neg_dist;
     }
 }
-impl Eq for WeightedState { }
+impl Eq for WeightedState {}
 impl Ord for WeightedState {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         if self.neg_dist > other.neg_dist {
@@ -51,7 +60,8 @@ impl Ord for WeightedState {
 }
 
 fn select_cluster(visibility: &[f64; MAX_K], pheromone: &[f64; MAX_K], k: usize, q0: f64) -> usize {
-    if rand::thread_rng().gen_range(0.0, 1.0) < q0 { // 直接選可能性最大者
+    if rand::thread_rng().gen_range(0.0, 1.0) < q0 {
+        // 直接選可能性最大者
         let (mut max_i, mut max) = (0, std::f64::MIN);
         for i in 0..k {
             if max < pheromone[i] * visibility[i] {
@@ -60,7 +70,8 @@ fn select_cluster(visibility: &[f64; MAX_K], pheromone: &[f64; MAX_K], k: usize,
             }
         }
         max_i
-    } else { // 走隨機過程
+    } else {
+        // 走隨機過程
         let mut sum = 0.0;
         for i in 0..k {
             sum += pheromone[i] * visibility[i];
@@ -73,7 +84,7 @@ fn select_cluster(visibility: &[f64; MAX_K], pheromone: &[f64; MAX_K], k: usize,
                 return i;
             }
         }
-        k-1
+        k - 1
     }
 }
 
@@ -86,7 +97,7 @@ pub struct ACO {
     tao0: f64,
     q0: f64,
     max_ph: f64,
-    min_ph: f64
+    min_ph: f64,
 }
 
 impl ACO {
@@ -101,13 +112,14 @@ impl ACO {
         };
         ACO {
             pheromone: (0..state_len).map(|_| [tao0; MAX_K]).collect(),
-            tao0, k,
+            tao0,
+            k,
             r: R,
             l: L,
             rho: RHO,
             q0: Q0,
             max_ph: MAX_PH,
-            min_ph: MIN_PH
+            min_ph: MIN_PH,
         }
     }
     #[inline(always)]
@@ -124,10 +136,15 @@ impl ACO {
     pub fn get_pharamon(&self) -> &Vec<[f64; MAX_K]> {
         return &self.pheromone;
     }
-    pub fn do_aco<F>(&mut self, time_limit: u128,
+    pub fn do_aco<F>(
+        &mut self,
+        time_limit: u128,
         visibility: &Vec<[f64; MAX_K]>,
-        mut calculate_dist: F
-    ) -> State where F: FnMut(&State) -> f64 {
+        mut calculate_dist: F,
+    ) -> State
+    where
+        F: FnMut(&State) -> f64,
+    {
         let time = std::time::Instant::now();
         let mut best_state = WeightedState::new(std::f64::MAX, None);
         let mut epoch = 0;
@@ -144,9 +161,14 @@ impl ACO {
         println!("ACO epoch = {}", epoch);
         best_state.state.unwrap()
     }
-    fn do_single_epoch<F>(&mut self, visibility: &Vec<[f64; MAX_K]>,
-        calculate_dist: &mut F) -> WeightedState
-    where F: FnMut(&State) -> f64 {
+    fn do_single_epoch<F>(
+        &mut self,
+        visibility: &Vec<[f64; MAX_K]>,
+        calculate_dist: &mut F,
+    ) -> WeightedState
+    where
+        F: FnMut(&State) -> f64,
+    {
         let mut max_heap: BinaryHeap<WeightedState> = BinaryHeap::new();
         let state_len = self.get_state_len();
         for _ in 0..self.r {
@@ -177,7 +199,7 @@ impl ACO {
     fn offline_update(&mut self, mut max_heap: BinaryHeap<WeightedState>) -> WeightedState {
         let best_state = max_heap.pop().unwrap();
         self.update_pheromon(&best_state);
-        for _ in 0..self.l-1 {
+        for _ in 0..self.l - 1 {
             let w_state = max_heap.pop().unwrap();
             self.update_pheromon(&w_state);
         }
@@ -207,7 +229,7 @@ impl ACO {
             ACOArgsF64::Rho => self.rho = arg,
             ACOArgsF64::Q0 => self.q0 = arg,
             ACOArgsF64::MaxPh => self.max_ph = arg,
-            ACOArgsF64::MinPh => self.min_ph = arg
+            ACOArgsF64::MinPh => self.min_ph = arg,
         }
     }
     pub fn set_args_usize(&mut self, arg_type: ACOArgsUSize, arg: usize) {

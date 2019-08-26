@@ -1,24 +1,24 @@
-use std::rc::Rc;
 use super::super::Flow;
+use std::rc::Rc;
 /// 儲存的資料分為兩部份：資料流本身，以及隨附的資訊（T）。
-/// 
+///
 /// __注意！這個資料結構 clone 的時候並不會把所有資料流複製一次，只會複製資訊的部份。__
-/// 
+///
 /// 此處隱含的假設為：資料流本身不會時常變化，在演算法執行的過程中應該是唯一不變的，因此用一個 Rc 來記憶即可。
-/// 
+///
 /// TODO 觀察在大資料量下這個改動是否有優化的效果。在小資料量下似乎沒啥差別。
 #[derive(Clone)]
 pub struct FlowTable<T: Clone> {
     changed: Option<Vec<usize>>,
     flow_list: Rc<Vec<Option<Flow>>>,
-    infos: Vec<Option<T>>
+    infos: Vec<Option<T>>,
 }
-impl <T: Clone> FlowTable<T> {
+impl<T: Clone> FlowTable<T> {
     pub fn new() -> Self {
         FlowTable {
             changed: None,
             infos: vec![],
-            flow_list: Rc::new(vec![])
+            flow_list: Rc::new(vec![]),
         }
     }
     /// 建立一個新的資料流表。邏輯上，這個新資料流表為空，但可以執行 update_info。
@@ -38,7 +38,7 @@ impl <T: Clone> FlowTable<T> {
         FlowTable {
             changed: Some(vec![]),
             infos: vec![None; self.infos.len()],
-            flow_list: self.flow_list.clone()
+            flow_list: self.flow_list.clone(),
         }
     }
     pub fn check_flow_exist(&self, id: usize) -> bool {
@@ -94,17 +94,13 @@ impl <T: Clone> FlowTable<T> {
             changed.push(id);
         }
     }
-    pub fn foreach(&self, is_avb: bool,
-        mut callback: impl FnMut(&Flow, &T)
-    ) {
+    pub fn foreach(&self, is_avb: bool, mut callback: impl FnMut(&Flow, &T)) {
         self.foreach_mut(is_avb, |flow, t| {
             callback(flow, t);
         });
     }
     /// __慎用！__ 實現了內部可變性
-    pub fn foreach_mut(&self, is_avb: bool,
-        mut callback: impl FnMut(&Flow, &mut T)
-    ) {
+    pub fn foreach_mut(&self, is_avb: bool, mut callback: impl FnMut(&Flow, &mut T)) {
         if let Some(changed) = &self.changed {
             for &i in changed.iter() {
                 self.apply_callback(is_avb, i, |flow, t| {
@@ -120,9 +116,7 @@ impl <T: Clone> FlowTable<T> {
         }
     }
     #[inline(always)]
-    fn apply_callback(&self, is_avb: bool, index: usize,
-        mut callback: impl FnMut(&Flow, &mut T)
-    ) {
+    fn apply_callback(&self, is_avb: bool, index: usize, mut callback: impl FnMut(&Flow, &mut T)) {
         if let Some(info) = &self.infos[index] {
             let flow = self.flow_list[index].as_ref().unwrap();
             let _info = info as *const T as *mut T;
@@ -160,8 +154,8 @@ impl <T: Clone> FlowTable<T> {
 
 #[cfg(test)]
 mod test {
-    use crate::read_flows_from_file;
     use super::*;
+    use crate::read_flows_from_file;
     #[test]
     #[should_panic]
     fn datarace_should_panic() {

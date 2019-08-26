@@ -1,12 +1,12 @@
-use crate::T_LIMIT;
-use crate::network_struct::Graph;
-use crate::util::YensAlgo;
-use crate::util::aco::ACO;
-use super::{StreamAwareGraph, RoutingAlgo, Flow, FlowTable, GCL};
 use super::time_and_tide::schedule_online;
+use super::{Flow, FlowTable, RoutingAlgo, StreamAwareGraph, GCL};
+use crate::network_struct::Graph;
+use crate::util::aco::ACO;
+use crate::util::YensAlgo;
+use crate::T_LIMIT;
 
 mod cost_calculate;
-pub(self) use cost_calculate::{compute_avb_cost, compute_all_avb_cost};
+pub(self) use cost_calculate::{compute_all_avb_cost, compute_avb_cost};
 
 mod aco_routing;
 use aco_routing::do_aco;
@@ -23,12 +23,13 @@ pub struct AdamsAnt<'a> {
     avb_count: usize,
     tt_count: usize,
 }
-impl <'a> AdamsAnt<'a> {
+impl<'a> AdamsAnt<'a> {
     pub fn new(g: &'a StreamAwareGraph, flow_table: Option<FT>, gcl: Option<GCL>) -> Self {
         let flow_table = flow_table.unwrap_or(FlowTable::new());
         let gcl = gcl.unwrap_or(GCL::new(1, g.get_edge_cnt()));
         AdamsAnt {
-            gcl, flow_table,
+            gcl,
+            flow_table,
             aco: ACO::new(0, K, None),
             g: g.clone(),
             yens_algo: YensAlgo::new(g, K),
@@ -43,17 +44,18 @@ impl <'a> AdamsAnt<'a> {
     fn get_candidate_count(&self, flow: &Flow) -> usize {
         self.yens_algo.get_route_count(*flow.src(), *flow.dst())
     }
-    fn schedule_online(&self, gcl: &mut GCL,
-        og_table: &mut FT, changed_table: &FT
+    fn schedule_online(
+        &self,
+        gcl: &mut GCL,
+        og_table: &mut FT,
+        changed_table: &FT,
     ) -> Result<bool, ()> {
         let _self = self as *const Self;
         unsafe {
-            schedule_online(og_table, changed_table, gcl,
-                |flow, &k| {
-                    let r = (*_self).get_kth_route(*flow.id(), k);
-                    (*_self).g.get_links_id_bandwidth(r)
-                }
-            )
+            schedule_online(og_table, changed_table, gcl, |flow, &k| {
+                let r = (*_self).get_kth_route(*flow.id(), k);
+                (*_self).g.get_links_id_bandwidth(r)
+            })
         }
     }
     unsafe fn save_flowid_on_edge(&self, remember: bool, flow_id: usize, k: usize) {
@@ -63,7 +65,7 @@ impl <'a> AdamsAnt<'a> {
     }
 }
 
-impl <'a> RoutingAlgo for AdamsAnt<'a> {
+impl<'a> RoutingAlgo for AdamsAnt<'a> {
     fn add_flows(&mut self, flows: Vec<Flow>) {
         self.add_flows_in_time(flows, T_LIMIT);
     }
@@ -87,13 +89,18 @@ impl <'a> RoutingAlgo for AdamsAnt<'a> {
         self.flow_table.foreach(true, |flow, &route_k| {
             let route = self.get_kth_route(*flow.id(), route_k);
             let cost = self.compute_avb_cost(flow, Some(route_k));
-            println!("flow id = {}, route = {:?} cost = {}", *flow.id(), route, cost);
+            println!(
+                "flow id = {}, route = {:?} cost = {}",
+                *flow.id(),
+                route,
+                cost
+            );
         });
         println!("total avb cost = {}", self.compute_all_avb_cost());
     }
 }
 
-impl <'a> AdamsAnt<'a> {
+impl<'a> AdamsAnt<'a> {
     pub fn compute_avb_cost(&self, flow: &Flow, k: Option<usize>) -> f64 {
         compute_avb_cost(self, flow, k, &self.flow_table, &self.gcl)
     }
@@ -118,8 +125,8 @@ impl <'a> AdamsAnt<'a> {
 
         do_aco(self, t_limit, reconf);
         self.g.forget_all_flows();
-        self.flow_table.foreach(true, |flow, r| {
-            unsafe { self.save_flowid_on_edge(true, *flow.id(), *r) }
+        self.flow_table.foreach(true, |flow, r| unsafe {
+            self.save_flowid_on_edge(true, *flow.id(), *r)
         });
     }
 }

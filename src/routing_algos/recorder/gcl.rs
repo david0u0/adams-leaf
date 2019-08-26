@@ -34,7 +34,7 @@ pub struct GCL {
     gate_evt: Vec<Vec<(u32, u32, u8, usize)>>,
     queue_occupy_evt: Vec<[Vec<(u32, u32, usize)>; MAX_QUEUE as usize]>,
     queue_map: HashMap<(usize, usize), u8>,
-    gate_evt_lookup: Vec<Option<Vec<(u32, u32)>>>
+    gate_evt_lookup: Vec<Option<Vec<(u32, u32)>>>,
 }
 impl GCL {
     pub fn new(hyper_p: u32, edge_count: usize) -> Self {
@@ -43,7 +43,7 @@ impl GCL {
             gate_evt_lookup: vec![None; edge_count],
             queue_occupy_evt: vec![Default::default(); edge_count],
             queue_map: HashMap::new(),
-            hyper_p
+            hyper_p,
         }
     }
     pub fn update_hyper_p(&mut self, new_p: u32) {
@@ -71,7 +71,8 @@ impl GCL {
                 let first_evt = self.gate_evt[link_id][0];
                 let mut cur_evt = (first_evt.0, first_evt.1);
                 for &(start, duration, ..) in self.gate_evt[link_id][1..len].iter() {
-                    if cur_evt.0 + cur_evt.1 == start { // 首尾相接
+                    if cur_evt.0 + cur_evt.1 == start {
+                        // 首尾相接
                         cur_evt.1 += duration; // 把閘門事件延長
                     } else {
                         lookup.push(cur_evt);
@@ -80,15 +81,21 @@ impl GCL {
                 }
                 lookup.push(cur_evt);
             }
-            unsafe { // NOTE 內部可變，因為這只是加速用的
+            unsafe {
+                // NOTE 內部可變，因為這只是加速用的
                 let _self = self as *const Self as *mut Self;
                 (*_self).gate_evt_lookup[link_id] = Some(lookup);
             }
         }
         self.gate_evt_lookup[link_id].as_ref().unwrap()
     }
-    pub fn insert_gate_evt(&mut self, link_id: usize, flow_id: usize,
-        queue_id: u8, start_time: u32, duration: u32
+    pub fn insert_gate_evt(
+        &mut self,
+        link_id: usize,
+        flow_id: usize,
+        queue_id: u8,
+        start_time: u32,
+        duration: u32,
     ) {
         self.gate_evt_lookup[link_id] = None;
         let entry = (start_time, duration, queue_id, flow_id);
@@ -96,17 +103,27 @@ impl GCL {
         match evts.binary_search(&entry) {
             Ok(_) => panic!("插入重複的閘門事件: link={}, {:?}", link_id, entry),
             Err(pos) => {
-                if pos > 0 && evts[pos-1].0 + evts[pos-1].1 > start_time {
+                if pos > 0 && evts[pos - 1].0 + evts[pos - 1].1 > start_time {
                     // 開始時間位於前一個事件中
-                    panic!("插入重疊的閘門事件： link={}, {:?} v.s. {:?}", link_id, evts[pos-1], entry);
+                    panic!(
+                        "插入重疊的閘門事件： link={}, {:?} v.s. {:?}",
+                        link_id,
+                        evts[pos - 1],
+                        entry
+                    );
                 } else {
                     evts.insert(pos, entry)
                 }
             }
         }
     }
-    pub fn insert_queue_evt(&mut self, link_id: usize, flow_id: usize,
-        queue_id: u8, start_time: u32, duration: u32
+    pub fn insert_queue_evt(
+        &mut self,
+        link_id: usize,
+        flow_id: usize,
+        queue_id: u8,
+        start_time: u32,
+        duration: u32,
     ) {
         if duration == 0 {
             return;
@@ -114,11 +131,14 @@ impl GCL {
         let entry = (start_time, duration, flow_id);
         let evts = &mut self.queue_occupy_evt[link_id][queue_id as usize];
         match evts.binary_search(&entry) {
-            Ok(_) => panic!("插入重複的佇列事件: link={}, queue={}, {:?}", link_id, queue_id, entry),
+            Ok(_) => panic!(
+                "插入重複的佇列事件: link={}, queue={}, {:?}",
+                link_id, queue_id, entry
+            ),
             Err(pos) => {
-                if pos > 0 && evts[pos-1].0 + evts[pos-1].1 >= start_time {
+                if pos > 0 && evts[pos - 1].0 + evts[pos - 1].1 >= start_time {
                     // 開始時間位於前一個事件中，則延伸前一個事件
-                    evts[pos-1].1 = start_time + duration - evts[pos-1].0;
+                    evts[pos - 1].1 = start_time + duration - evts[pos - 1].0;
                 } else {
                     evts.insert(pos, entry)
                 }
@@ -126,25 +146,30 @@ impl GCL {
         }
     }
     /// 會先確認 start~(start+duration) 這段時間中有沒有與其它事件重疊
-    /// 
+    ///
     /// 若否，則回傳 None，應可直接塞進去。若有重疊，則會告知下一個空的時間（但不一定塞得進去）
-    pub fn get_next_empty_time(&self, link_id: usize,
-        start: u32, duration: u32
-    ) -> Option<u32> {
-        assert!(self.gate_evt.len() > link_id,
-            "GCL: 指定了超出範圍的邊: {}/{}", link_id, self.gate_evt.len());
+    pub fn get_next_empty_time(&self, link_id: usize, start: u32, duration: u32) -> Option<u32> {
+        assert!(
+            self.gate_evt.len() > link_id,
+            "GCL: 指定了超出範圍的邊: {}/{}",
+            link_id,
+            self.gate_evt.len()
+        );
         let s1 = self.get_next_spot(link_id, start);
-        let s2 = self.get_next_spot(link_id, start+duration);
-        if s1.0 != s2.0 { // 是不同的閘門事
+        let s2 = self.get_next_spot(link_id, start + duration);
+        if s1.0 != s2.0 {
+            // 是不同的閘門事
             Some(s1.0)
-        } else if s1.1 { // 是同一個閘門事件的開始
+        } else if s1.1 {
+            // 是同一個閘門事件的開始
             None
-        } else { // 是同一個閘門事件的結束，代表 start~duration 這段時間正處於該事件之中，重疊了!
+        } else {
+            // 是同一個閘門事件的結束，代表 start~duration 這段時間正處於該事件之中，重疊了!
             Some(s2.0)
         }
     }
     /// 計算最近的下一個「時間點」，此處的時間點有可能是閘門事件的開啟或結束。
-    /// 
+    ///
     /// 回傳一組資料(usize, bool)，前者代表時間，後者代表該時間是閘門事件的開始還是結束（真代表開始）
     fn get_next_spot(&self, link_id: usize, time: u32) -> (u32, bool) {
         // TODO 應該用二元搜索來優化?
@@ -164,8 +189,11 @@ impl GCL {
         self.queue_map.insert((link_id, flow_id), queueid);
     }
     /// 回傳 None 者，代表當前即是空的
-    pub fn get_next_queue_empty_time(&self,
-        link_id: usize, queue_id: u8, time: u32,
+    pub fn get_next_queue_empty_time(
+        &self,
+        link_id: usize,
+        queue_id: u8,
+        time: u32,
     ) -> Option<u32> {
         let evts = &self.queue_occupy_evt[link_id][queue_id as usize];
         for &(start, duration, _) in evts.iter() {

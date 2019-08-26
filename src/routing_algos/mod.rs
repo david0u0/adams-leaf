@@ -57,7 +57,7 @@ impl AVBType {
     }
 }
 
-build_shared_enum! { 
+build_shared_enum! {
     Flow {
         id: usize,
         size: usize,
@@ -121,7 +121,7 @@ pub use adams_ant::AdamsAnt;
 
 #[cfg(test)]
 mod test {
-    build_shared_enum! { 
+    build_shared_enum! {
         TestEnum { a: i32, b: String },
         Test1 { c1: String },
         Test2 { c2: usize, d2: Box<TestEnum> },
@@ -130,19 +130,27 @@ mod test {
     #[test]
     fn test_share_enum_macro() {
         let t1 = TestEnum::Test1 {
-            a: 1, b: String::from("a"), c1: String::from("B")
+            a: 1,
+            b: String::from("a"),
+            c1: String::from("B"),
         };
         assert_eq!(1, *t1.a());
         assert_eq!(String::from("a"), *t1.b());
         let t2 = TestEnum::Test2 {
-            a: 2, b: String::from("gg"), c2: 9, d2: Box::new(t1)
+            a: 2,
+            b: String::from("gg"),
+            c2: 9,
+            d2: Box::new(t1),
         };
         if let TestEnum::Test2 { d2, .. } = t2 {
             assert_eq!(String::from("a"), *d2.b());
         } else {
             panic!();
         }
-        let t3 = TestEnum::Test3 { a: 3, b: String::from("kk") };
+        let t3 = TestEnum::Test3 {
+            a: 3,
+            b: String::from("kk"),
+        };
         assert_eq!(3, *t3.a());
     }
 }

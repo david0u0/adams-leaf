@@ -4,20 +4,20 @@ use std::hash::Hash;
 enum Justify {
     Left,
     Right,
-    Root
+    Root,
 }
 
-pub struct MyMinHeap<P: PartialOrd, K: Hash+Eq+Clone, V=()> {
+pub struct MyMinHeap<P: PartialOrd, K: Hash + Eq + Clone, V = ()> {
     vec: Vec<(K, P, V)>,
-    table: HashMap<K, usize>
+    table: HashMap<K, usize>,
 }
 
-impl <P: PartialOrd, K: Hash+Clone+Eq, V> MyMinHeap<P, K, V> {
+impl<P: PartialOrd, K: Hash + Clone + Eq, V> MyMinHeap<P, K, V> {
     pub fn new() -> Self {
         return MyMinHeap {
             vec: vec![],
-            table: HashMap::new()
-        }
+            table: HashMap::new(),
+        };
     }
     fn swap(&mut self, i1: usize, i2: usize) {
         if i1 != i2 {
@@ -35,12 +35,12 @@ impl <P: PartialOrd, K: Hash+Clone+Eq, V> MyMinHeap<P, K, V> {
                 let right = &self.vec[index * 2 + 2];
                 if right.1 < root.1 && right.1 < left.1 {
                     // 與右手交換
-                    self.swap(index, index*2+2);
+                    self.swap(index, index * 2 + 2);
                     return Justify::Right;
                 }
             }
             if left.1 < root.1 {
-                self.swap(index, index*2 + 1);
+                self.swap(index, index * 2 + 1);
                 return Justify::Left;
             }
         }
@@ -110,7 +110,6 @@ impl <P: PartialOrd, K: Hash+Clone+Eq, V> MyMinHeap<P, K, V> {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     type TestV = i32;
@@ -122,20 +121,20 @@ mod test {
         heap.push(3, 1.0, 30);
         heap.push(1, 3.0, 10);
 
-        let contains_3 = heap.contains_key(&3); 
+        let contains_3 = heap.contains_key(&3);
         assert_eq!(true, contains_3);
 
         assert_eq!(heap.pop().unwrap(), (3, 1.0, 30));
-        let contains_3 = heap.contains_key(&3); 
+        let contains_3 = heap.contains_key(&3);
         assert_eq!(false, contains_3);
 
-        let contains_4 = heap.contains_key(&4); 
+        let contains_4 = heap.contains_key(&4);
         assert_eq!(false, contains_4);
 
         heap.push(4, 0.0, 40);
         heap.push(5, 2.1, 50);
 
-        let contains_4 = heap.contains_key(&4); 
+        let contains_4 = heap.contains_key(&4);
         assert_eq!(true, contains_4);
 
         assert_eq!(heap.pop().unwrap(), (4, 0.0, 40));

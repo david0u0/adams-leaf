@@ -1,23 +1,23 @@
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::hash::Hash;
-use std::cell::Cell;
 
-use crate::network_struct::Graph;
 use super::MyMinHeap;
+use crate::network_struct::Graph;
 
-pub struct Dijkstra<'a, K: Hash+Eq+Copy, G: Graph<K>> {
+pub struct Dijkstra<'a, K: Hash + Eq + Copy, G: Graph<K>> {
     g: &'a G,
     final_dist_map: HashMap<(K, K), (f64, Cell<K>)>,
-    routed_node_table: HashMap<K, bool>
+    routed_node_table: HashMap<K, bool>,
 }
 
-impl <'a, K: Hash+Eq+Copy, G: Graph<K>> Dijkstra<'a, K, G> {
+impl<'a, K: Hash + Eq + Copy, G: Graph<K>> Dijkstra<'a, K, G> {
     pub fn new(g: &'a G) -> Self {
         return Dijkstra {
             g,
             final_dist_map: HashMap::new(),
             routed_node_table: HashMap::new(),
-        }
+        };
     }
     pub fn compute_route(&mut self, src_id: K) {
         if self.routed_node_table.contains_key(&src_id) {
@@ -26,12 +26,12 @@ impl <'a, K: Hash+Eq+Copy, G: Graph<K>> Dijkstra<'a, K, G> {
         self.routed_node_table.insert(src_id, true);
 
         let mut min_heap: MyMinHeap<f64, K, Cell<K>> = MyMinHeap::new();
-        min_heap.push( src_id, 0.0, Cell::new(src_id) );
+        min_heap.push(src_id, 0.0, Cell::new(src_id));
         // 從優先權佇列中移除，並塞進最終 dist map
         while let Some((cur_id, cur_dist, backtrace)) = min_heap.pop() {
-            self.final_dist_map.insert((src_id, cur_id),
-                (cur_dist, backtrace));
-            
+            self.final_dist_map
+                .insert((src_id, cur_id), (cur_dist, backtrace));
+
             self.g.foreach_edge(cur_id, |next_id, bandwidth| {
                 let next_pair = (src_id, next_id);
                 let next_dist = cur_dist + 1.0 / bandwidth;
@@ -73,9 +73,9 @@ impl <'a, K: Hash+Eq+Copy, G: Graph<K>> Dijkstra<'a, K, G> {
 
 #[cfg(test)]
 mod test {
+    use super::Dijkstra;
     use crate::network_struct::Graph;
     use crate::routing_algos::StreamAwareGraph;
-    use super::Dijkstra;
     #[test]
     fn test_dijkstra1() -> Result<(), String> {
         let mut g = StreamAwareGraph::new();

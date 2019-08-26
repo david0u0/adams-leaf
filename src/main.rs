@@ -1,6 +1,6 @@
 use std::env;
 
-use adams_leaf::routing_algos::{RO, RoutingAlgo, AdamsAnt, SPF};
+use adams_leaf::routing_algos::{AdamsAnt, RoutingAlgo, RO, SPF};
 use adams_leaf::{read_flows_from_file, read_topo_from_file};
 
 fn main() -> Result<(), String> {
@@ -9,7 +9,11 @@ fn main() -> Result<(), String> {
         if args.len() == 4 {
             (args[1].clone(), args[2].clone(), args[3].clone())
         } else if args.len() == 1 {
-            ("aco".to_owned(), "test_graph.json".to_owned(), "test_flows.json".to_owned())
+            (
+                "aco".to_owned(),
+                "test_graph.json".to_owned(),
+                "test_flows.json".to_owned(),
+            )
         } else {
             println!("用法： adams_leaf [algo type] [flow.json] [topo.json]");
             panic!();

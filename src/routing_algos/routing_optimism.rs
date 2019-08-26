@@ -1,11 +1,11 @@
 use rand::Rng;
 use std::time::Instant;
 
-use crate::T_LIMIT;
-use crate::util::YensAlgo;
-use crate::network_struct::Graph;
-use super::{StreamAwareGraph, FlowTable, Flow, RoutingAlgo, GCL};
 use super::time_and_tide::{compute_avb_latency, schedule_online};
+use super::{Flow, FlowTable, RoutingAlgo, StreamAwareGraph, GCL};
+use crate::network_struct::Graph;
+use crate::util::YensAlgo;
+use crate::T_LIMIT;
 
 type FT = FlowTable<usize>;
 
@@ -34,7 +34,7 @@ pub struct RO<'a> {
     tt_count: usize,
 }
 
-impl <'a> RO<'a> {
+impl<'a> RO<'a> {
     pub fn new(g: &'a StreamAwareGraph, flow_table: Option<FT>, gcl: Option<GCL>) -> Self {
         let flow_table = flow_table.unwrap_or(FlowTable::new());
         let gcl = gcl.unwrap_or(GCL::new(1, g.get_edge_cnt()));
@@ -43,31 +43,22 @@ impl <'a> RO<'a> {
             yens_algo: YensAlgo::new(g, K),
             avb_count: flow_table.get_count(true),
             tt_count: flow_table.get_count(false),
-            gcl, flow_table,
+            gcl,
+            flow_table,
         }
     }
     pub fn compute_avb_cost(&self, flow: &Flow, k: Option<usize>) -> f64 {
         let k = match k {
             Some(t) => t,
-            None => *self.flow_table.get_info(*flow.id())
+            None => *self.flow_table.get_info(*flow.id()),
         };
         let max_delay = *flow.max_delay();
         let route = self.get_kth_route(flow, k);
-        let latency = compute_avb_latency(
-            &self.g,
-            flow,
-            route,
-            &self.flow_table,
-            &self.gcl
-        );
-        let c1 = if latency > max_delay {
-            C1_EXCEED
-        } else {
-            0.0
-        };
+        let latency = compute_avb_latency(&self.g, flow, route, &self.flow_table, &self.gcl);
+        let c1 = if latency > max_delay { C1_EXCEED } else { 0.0 };
         let c2 = latency as f64 / max_delay as f64;
         let c3 = 0.0; // TODO 計算 c3
-        W1*c1 + W2*c2 + W3*c3
+        W1 * c1 + W2 * c2 + W3 * c3
     }
     pub fn compute_all_avb_cost(&self) -> f64 {
         let mut cost = 0.0;
@@ -128,19 +119,25 @@ impl <'a> RO<'a> {
         }
         best_k
     }
-    fn hill_climbing(&mut self, time: &std::time::Instant,
-        mut min_cost: f64, best_all_routing: &mut FT
+    fn hill_climbing(
+        &mut self,
+        time: &std::time::Instant,
+        mut min_cost: f64,
+        best_all_routing: &mut FT,
     ) -> f64 {
         let mut iter_times = 0;
         while time.elapsed().as_micros() < T_LIMIT {
             let target_id = rand::thread_rng().gen_range(0, self.avb_count + self.tt_count);
             let target_flow = self.flow_table.get_flow(target_id);
-            if target_flow.is_tt() { // TODO 用更好的機制篩選 avb flow
+            if target_flow.is_tt() {
+                // TODO 用更好的機制篩選 avb flow
                 continue;
             }
             let old_route = *self.flow_table.get_info(target_id);
             // 從圖中忘記舊路徑
-            unsafe { self.save_flowid_on_edge(false, target_flow, old_route); }
+            unsafe {
+                self.save_flowid_on_edge(false, target_flow, old_route);
+            }
             let new_route = self.find_min_cost_route(target_flow, None);
             let cost = if old_route == new_route {
                 std::f64::MAX
@@ -163,10 +160,14 @@ impl <'a> RO<'a> {
                 println!("found min_cost = {}", cost);
             } else {
                 // 恢復上一動
-                unsafe { self.save_flowid_on_edge(false, target_flow, new_route); }
-                unsafe { self.save_flowid_on_edge(true, target_flow, old_route); }
+                unsafe {
+                    self.save_flowid_on_edge(false, target_flow, new_route);
+                }
+                unsafe {
+                    self.save_flowid_on_edge(true, target_flow, old_route);
+                }
                 self.flow_table.update_info(target_id, old_route);
-                
+
                 iter_times += 1;
                 if iter_times == self.avb_count {
                     break;
@@ -187,7 +188,7 @@ impl <'a> RO<'a> {
         (*_g).save_flowid_on_edge(remember, *flow.id(), route);
     }
 }
-impl <'a> RoutingAlgo for RO<'a> {
+impl<'a> RoutingAlgo for RO<'a> {
     fn add_flows(&mut self, flows: Vec<Flow>) {
         self.flow_table.insert(flows.clone(), 0);
         let mut tt_changed = self.flow_table.clone_into_changed_table();
@@ -204,18 +205,22 @@ impl <'a> RoutingAlgo for RO<'a> {
         // TT schedule
         unsafe {
             let _self = self as *mut Self;
-            schedule_online(&mut (*_self).flow_table, &tt_changed, &mut (*_self).gcl,
+            schedule_online(
+                &mut (*_self).flow_table,
+                &tt_changed,
+                &mut (*_self).gcl,
                 |flow, &k| {
                     let r = self.get_kth_route(flow, k);
                     self.g.get_links_id_bandwidth(r)
-                }
-            ).unwrap();
+                },
+            )
+            .unwrap();
         }
 
         self.grasp(time);
         self.g.forget_all_flows();
-        self.flow_table.foreach(true, |flow, r| {
-            unsafe { self.save_flowid_on_edge(true, flow, *r); }
+        self.flow_table.foreach(true, |flow, r| unsafe {
+            self.save_flowid_on_edge(true, flow, *r);
         });
     }
     fn del_flows(&mut self, flows: Vec<Flow>) {
@@ -239,7 +244,12 @@ impl <'a> RoutingAlgo for RO<'a> {
         self.flow_table.foreach(true, |flow, &route_k| {
             let route = self.get_kth_route(flow, route_k);
             let cost = self.compute_avb_cost(flow, Some(route_k));
-            println!("flow id = {}, route = {:?} cost = {}", *flow.id(), route, cost);
+            println!(
+                "flow id = {}, route = {:?} cost = {}",
+                *flow.id(),
+                route,
+                cost
+            );
         });
         println!("total avb cost = {}", self.compute_all_avb_cost());
     }
