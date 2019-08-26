@@ -103,7 +103,7 @@ impl<'a> RO<'a> {
             if cost < min_cost {
                 best_all_routing = self.flow_table.clone();
                 min_cost = cost;
-                println!("found min_cost = {} at first glance!", cost);
+                println!("found min_cost = {} at first glance! {}", cost, fail_cnt);
                 if fail_cnt == 0 {
                     break;
                 }

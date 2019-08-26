@@ -4,7 +4,7 @@ macro_rules! build_shared_enum {
     } {
         $( $shared_field_name: ident: $shared_field_type: ty ),*
     } ),*) => {
-        #[derive(Clone)]
+        #[derive(Clone, Debug)]
         pub enum $enum_name {
             $(
                 $name {
@@ -40,7 +40,7 @@ macro_rules! build_shared_enum {
     };
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct AVBType(bool);
 impl AVBType {
     pub fn new_type_a() -> Self {
