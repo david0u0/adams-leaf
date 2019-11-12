@@ -174,7 +174,7 @@ mod test {
     #[test]
     fn test_changed_flow_table() {
         let mut table = FlowTable::<usize>::new();
-        let flows = read_flows_from_file(0, "test_flows.json");
+        let flows = read_flows_from_file(0, "test_flow.json", 1);
         table.insert(flows, 0);
         assert_eq!(count_flows_inside(&table), 6);
 
@@ -200,7 +200,7 @@ mod test {
     #[should_panic]
     fn union_different_flows_should_panic() {
         let mut table = FlowTable::<usize>::new();
-        let flows = read_flows_from_file(0, "test_flows.json");
+        let flows = read_flows_from_file(0, "test_flow.json", 1);
         table.insert(flows.clone(), 0);
         let mut table2 = FlowTable::<usize>::new();
         table2.insert(flows.clone(), 0);
