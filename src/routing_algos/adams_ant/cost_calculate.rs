@@ -5,10 +5,7 @@ type FT = FlowTable<usize>;
 
 pub type AVBCostResult = (u32, f64);
 
-const C1_EXCEED: f64 = 100.0;
-const W1: f64 = 1.0;
-const W2: f64 = 1.0;
-const W3: f64 = 1.0;
+use crate::{W1, W2, W3};
 
 pub fn compute_avb_cost(
     algo: &AdamsAnt,
@@ -24,7 +21,7 @@ pub fn compute_avb_cost(
     let max_delay = *flow.max_delay();
     let route = algo.get_kth_route(*flow.id(), k);
     let latency = compute_avb_latency(&algo.g, flow, route, table, gcl);
-    let c1 = if latency > max_delay { C1_EXCEED } else { 0.0 };
+    let c1 = if latency > max_delay { 1.0 } else { 0.0 };
     let c2 = latency as f64 / max_delay as f64;
     let c3 = 0.0; // TODO 計算 c3
     if c1 > 0.1 {

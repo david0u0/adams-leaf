@@ -2,13 +2,10 @@ use std::time::Instant;
 
 use super::{compute_all_avb_cost, AVBCostResult, AdamsAnt, FlowTable};
 use crate::util::aco::{ShouldStopACO, ACO};
-use crate::MAX_K;
+use crate::{MAX_K, W1, W2};
 
-const TT_AFFINITY: f64 = 5.0; // 計算能見度時，TT 對舊路徑的偏好程度
-const AVB_AFFINITY: f64 = 3.0; // 計算能見度時，AVB 對舊路徑的偏好程度
-
-const W1: f64 = 10.0;
-const W2: f64 = 1.0;
+const TSN_MEMORY: f64 = 3.0; // 計算能見度時，TSN 對舊路徑的偏好程度
+const AVB_MEMORY: f64 = 3.0; // 計算能見度時，AVB 對舊路徑的偏好程度
 
 pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128, reconf: FlowTable<usize>) {
     let time = Instant::now();
@@ -43,8 +40,7 @@ pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128, reconf: FlowTable<usize>) {
 
 fn compute_visibility(algo: &AdamsAnt, reconf: &FlowTable<usize>) -> Vec<[f64; MAX_K]> {
     // TODO 好好設計能見度函式！
-    // 目前：AVB 為成本的倒數，且選中本來路徑的機率是改路徑機率的10倍
-    //      TT 為中間的節點數平方倒數
+    // 目前：路徑長的倒數
     let len = algo.aco.get_state_len();
     let mut vis = vec![[0.0; MAX_K]; len];
     algo.flow_table.foreach(true, |flow, &route_k| {
@@ -55,7 +51,7 @@ fn compute_visibility(algo: &AdamsAnt, reconf: &FlowTable<usize>) -> Vec<[f64; M
         }
         if !reconf.check_flow_exist(id) {
             // 是舊資料流，調高本來路徑的能見度
-            vis[id][route_k] *= AVB_AFFINITY;
+            vis[id][route_k] *= AVB_MEMORY;
         }
     });
     algo.flow_table.foreach(false, |flow, &route_k| {
@@ -65,7 +61,7 @@ fn compute_visibility(algo: &AdamsAnt, reconf: &FlowTable<usize>) -> Vec<[f64; M
         }
         if !reconf.check_flow_exist(id) {
             // 是舊資料流，調高本來路徑的能見度
-            vis[id][route_k] *= TT_AFFINITY;
+            vis[id][route_k] *= TSN_MEMORY;
         }
     });
     vis

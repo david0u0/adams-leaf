@@ -5,16 +5,12 @@ use super::time_and_tide::{compute_avb_latency, schedule_online};
 use super::{Flow, FlowTable, RoutingAlgo, StreamAwareGraph, GCL};
 use crate::network_struct::Graph;
 use crate::util::YensAlgo;
-use crate::T_LIMIT;
+use crate::{MAX_K, T_LIMIT};
+use crate::{W1, W2, W3};
 
 type FT = FlowTable<usize>;
 
-const K: usize = 20;
 const ALPHA_PORTION: f64 = 0.5;
-const C1_EXCEED: f64 = 100.0;
-const W1: f64 = 1.0;
-const W2: f64 = 1.0;
-const W3: f64 = 1.0;
 
 type AVBCostResult = (u32, f64);
 
@@ -43,7 +39,7 @@ impl<'a> RO<'a> {
         let gcl = gcl.unwrap_or(GCL::new(1, g.get_edge_cnt()));
         RO {
             g: g.clone(),
-            yens_algo: YensAlgo::new(g, K),
+            yens_algo: YensAlgo::new(g, MAX_K),
             avb_count: flow_table.get_count(true),
             tt_count: flow_table.get_count(false),
             gcl,
@@ -59,7 +55,7 @@ impl<'a> RO<'a> {
         let max_delay = *flow.max_delay();
         let route = self.get_kth_route(flow, k);
         let latency = compute_avb_latency(&self.g, flow, route, &self.flow_table, &self.gcl);
-        let c1 = if latency > max_delay { C1_EXCEED } else { 0.0 };
+        let c1 = if latency > max_delay { 1.0 } else { 0.0 };
         let c2 = latency as f64 / max_delay as f64;
         let c3 = 0.0; // TODO 計算 c3
         if c1 > 0.1 {

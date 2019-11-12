@@ -3,10 +3,7 @@ use super::{Flow, FlowTable, RoutingAlgo, StreamAwareGraph, GCL};
 use crate::network_struct::Graph;
 use crate::util::Dijkstra;
 
-const C1_EXCEED: f64 = 100.0;
-const W1: f64 = 1.0;
-const W2: f64 = 1.0;
-const W3: f64 = 1.0;
+use crate::{W1, W2, W3};
 
 pub struct SPF<'a> {
     g: StreamAwareGraph,
@@ -103,7 +100,7 @@ impl<'a> SPF<'a> {
         let max_delay = *flow.max_delay();
         let route = self.get_shortest_route(flow);
         let latency = compute_avb_latency(&self.g, flow, &route, &self.flow_table, &self.gcl);
-        let c1 = if latency > max_delay { C1_EXCEED } else { 0.0 };
+        let c1 = if latency > max_delay { 1.0 } else { 0.0 };
         let c2 = latency as f64 / max_delay as f64;
         let c3 = 0.0; // TODO 計算 c3
         W1 * c1 + W2 * c2 + W3 * c3

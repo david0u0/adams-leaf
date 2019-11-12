@@ -9,6 +9,10 @@ pub const MAX_QUEUE: u8 = 8;
 pub const MAX_K: usize = 20;
 pub const T_LIMIT: u128 = 1000 * 1000; // micro_sec
 
+pub const W1: f64 = 100.0;
+pub const W2: f64 = 1.0;
+pub const W3: f64 = 1.0;
+
 use routing_algos::{AVBType, Flow};
 
 pub fn read_flows_from_file(base_id: usize, file_name: &str, times: usize) -> Vec<Flow> {
