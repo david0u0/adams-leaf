@@ -15,8 +15,7 @@ fn main() -> Result<(), String> {
                 args[5].parse::<usize>().unwrap()
             )
         } else {
-            println!("用法： adams_leaf [algo type] [topo.json] [base_flow.json] [reconf_flow.json] [#times]");
-            panic!();
+            return Err("用法： adams_leaf [algo type] [topo.json] [base_flow.json] [reconf_flow.json] [倍數]".to_owned());
         }
     };
     let flows = read_flows_from_file(0, &flow_file_name, 1);
