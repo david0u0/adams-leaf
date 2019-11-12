@@ -3,6 +3,8 @@ use super::{AdamsAnt, Flow, FlowTable, GCL};
 
 type FT = FlowTable<usize>;
 
+/// - `0`: 整數，判斷該解有多少條 AVB 不可排程。
+/// - `1`: 浮點值，即成本。
 pub type AVBCostResult = (u32, f64);
 
 use crate::{W1, W2, W3};

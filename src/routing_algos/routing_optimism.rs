@@ -6,7 +6,7 @@ use super::{Flow, FlowTable, RoutingAlgo, StreamAwareGraph, GCL};
 use crate::network_struct::Graph;
 use crate::util::YensAlgo;
 use crate::{MAX_K, T_LIMIT};
-use crate::{W1, W2, W3};
+use crate::{W1, W2, W3, FAST_STOP};
 
 type FT = FlowTable<usize>;
 
@@ -107,7 +107,7 @@ impl<'a> RO<'a> {
             println!("start iteration #{}", iter_times);
             let res = self.hill_climbing(&time, min_cost, &mut best_all_routing);
             min_cost = res.1;
-            if res.0 == 0 {
+            if res.0 == 0 && FAST_STOP { // 找到可行解，且為快速終止模式
                 break;
             }
         }

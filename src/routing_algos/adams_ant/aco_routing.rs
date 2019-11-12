@@ -2,7 +2,7 @@ use std::time::Instant;
 
 use super::{compute_all_avb_cost, AVBCostResult, AdamsAnt, FlowTable};
 use crate::util::aco::{ShouldStopACO, ACO};
-use crate::{MAX_K, W1, W2};
+use crate::{MAX_K, W1, W2, FAST_STOP};
 
 const TSN_MEMORY: f64 = 3.0; // 計算能見度時，TSN 對舊路徑的偏好程度
 const AVB_MEMORY: f64 = 3.0; // 計算能見度時，AVB 對舊路徑的偏好程度
@@ -29,7 +29,7 @@ pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128, reconf: FlowTable<usize>) {
     let new_state = unsafe {
         (*aco).do_aco(time_limit - time.elapsed().as_micros(), &vis, |state| {
             let res = compute_aco_dist(algo, state, &mut best_dist);
-            if res.0 == 0 {
+            if res.0 == 0 && FAST_STOP { // 找到可行解，且為快速終止模式
                 ShouldStopACO::Yes(res.1)
             } else {
                 ShouldStopACO::No(res.1)
@@ -98,7 +98,7 @@ unsafe fn compute_aco_dist(
     }
     let result = algo.schedule_online(&mut gcl, &mut table, &tt_changed_table);
     if result.is_err() {
-        return (0, std::f64::MAX);
+        return (std::u32::MAX, std::f64::MAX);
     }
     let cost1 = if result.unwrap() { 1.0 } else { 0.0 };
 
