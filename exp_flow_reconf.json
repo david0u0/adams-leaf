@@ -1,11 +1,11 @@
 {
   "tt_flows": [
     {
-      "src": 0,
-      "dst": 5,
-      "size": 30000,
-      "period": 200,
-      "max_delay": 200,
+      "src": 3,
+      "dst": 2,
+      "size": 1500,
+      "period": 250,
+      "max_delay": 250,
       "offset": 0
     }
   ],
@@ -19,16 +19,16 @@
       "avb_type": "A"
     },
     {
-      "src": 3,
-      "dst": 7,
+      "src": 4,
+      "dst": 8,
       "size": 400,
       "period": 200,
       "max_delay": 200,
       "avb_type": "A"
     },
     {
-      "src": 4,
-      "dst": 8,
+      "src": 3,
+      "dst": 7,
       "size": 400,
       "period": 200,
       "max_delay": 200,

@@ -50,7 +50,8 @@ fn compute_visibility(algo: &AdamsAnt, reconf: &FlowTable<usize>) -> Vec<[f64; M
     algo.flow_table.foreach(true, |flow, &route_k| {
         let id = *flow.id();
         for i in 0..algo.get_candidate_count(flow) {
-            vis[id][i] = 1.0 / algo.compute_avb_cost(flow, Some(i)).1.powf(2.0);
+            //vis[id][i] = 1.0 / algo.compute_avb_cost(flow, Some(i)).1.powf(2.0);
+            vis[id][i] = 1.0 / algo.get_kth_route(id, route_k).len() as f64;
         }
         if !reconf.check_flow_exist(id) {
             // 是舊資料流，調高本來路徑的能見度

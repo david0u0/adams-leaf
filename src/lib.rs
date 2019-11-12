@@ -7,12 +7,18 @@ pub mod routing_algos;
 pub mod util;
 pub const MAX_QUEUE: u8 = 8;
 pub const MAX_K: usize = 20;
-pub const T_LIMIT: u128 = 10000 * 10; // micro_sec
+pub const T_LIMIT: u128 = 1000 * 1000; // micro_sec
 
 use routing_algos::{AVBType, Flow};
 
-pub fn read_flows_from_file(base_id: usize, file_name: &str) -> Vec<Flow> {
-    let mut flows = vec![];
+pub fn read_flows_from_file(base_id: usize, file_name: &str, times: usize) -> Vec<Flow> {
+    let mut flows = Vec::<Flow>::new();
+    for _ in 0..times {
+        read_flows_from_file_once(&mut flows, base_id, file_name);
+    }
+    flows
+}
+fn read_flows_from_file_once(flows: &mut Vec<Flow>, base_id: usize, file_name: &str) {
     let txt = fs::read_to_string(file_name).expect(&format!("找不到檔案: {}", file_name));
     let all_flows: AllFlows =
         serde_json::from_str(&txt).expect(&format!("無法解析檔案: {}", file_name));
@@ -46,7 +52,6 @@ pub fn read_flows_from_file(base_id: usize, file_name: &str) -> Vec<Flow> {
             },
         });
     }
-    flows
 }
 
 use network_struct::Graph;
