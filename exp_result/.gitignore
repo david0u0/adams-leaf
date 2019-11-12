@@ -1,1 +1,4 @@
 *.eps
+*.log
+*.pdf
+*.aux

@@ -14,7 +14,7 @@ set style data linespoints
 set size 0.8,0.8
 
 set xlabel "Number of new flows" font "Arial,22" offset 0,-0.5
-set ylabel "Computing time(microsecond)" font "Arial,22" offset -1,0
+set ylabel "Computing time (millisecond)" font "Arial,22" offset -1,0
 
 set logscale y
 
