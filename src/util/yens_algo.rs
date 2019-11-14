@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use super::Dijkstra;
 use super::MyMinHeap;
-use crate::network_struct::OnOffGraph;
+use crate::graph_util::OnOffGraph;
 
 type Path<K> = (f64, Vec<K>);
 
@@ -147,7 +147,7 @@ impl<'a, K: Hash + Eq + Copy + Debug, G: OnOffGraph<K>> YensAlgo<'a, K, G> {
 #[cfg(test)]
 mod test {
     use super::YensAlgo;
-    use crate::network_struct::{Graph, StreamAwareGraph};
+    use crate::graph_util::{Graph, StreamAwareGraph};
     #[test]
     #[ignore] // 用 cargo test -- --ignored 才可以測試
     fn test_yens_algo1() -> Result<(), String> {

@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::network_struct::{Graph, OnOffGraph};
+use crate::graph_util::{Graph, OnOffGraph};
 
 struct Node {
     is_switch: bool,

@@ -2,7 +2,7 @@ use std::fs;
 extern crate serde_json;
 use serde::{Deserialize, Serialize};
 
-pub mod network_struct;
+pub mod graph_util;
 pub mod routing_algos;
 pub mod util;
 pub const MAX_QUEUE: u8 = 8;
@@ -60,12 +60,12 @@ fn read_flows_from_file_once(flows: &mut Vec<Flow>, base_id: usize, file_name: &
     }
 }
 
-use network_struct::Graph;
-pub fn read_topo_from_file(file_name: &str) -> network_struct::StreamAwareGraph {
+use graph_util::Graph;
+pub fn read_topo_from_file(file_name: &str) -> graph_util::StreamAwareGraph {
     let txt = fs::read_to_string(file_name).expect(&format!("找不到檔案: {}", file_name));
     let json: GraphJSON =
         serde_json::from_str(&txt).expect(&format!("無法解析檔案: {}", file_name));
-    let mut g = network_struct::StreamAwareGraph::new();
+    let mut g = graph_util::StreamAwareGraph::new();
     g.add_host(Some(json.host_cnt));
     g.add_switch(Some(json.switch_cnt));
     for (n1, n2, bandwidth) in json.edges.into_iter() {

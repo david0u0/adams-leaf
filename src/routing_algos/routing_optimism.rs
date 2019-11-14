@@ -3,7 +3,7 @@ use std::time::Instant;
 
 use super::time_and_tide::{compute_avb_latency, schedule_online};
 use super::{Flow, FlowTable, RoutingAlgo, GCL};
-use crate::network_struct::{Graph, StreamAwareGraph};
+use crate::graph_util::{Graph, StreamAwareGraph};
 use crate::util::YensAlgo;
 use crate::{MAX_K, T_LIMIT};
 use crate::{W1, W2, W3, FAST_STOP};

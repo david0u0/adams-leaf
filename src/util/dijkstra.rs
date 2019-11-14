@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::hash::Hash;
 
 use super::MyMinHeap;
-use crate::network_struct::Graph;
+use crate::graph_util::Graph;
 
 pub struct Dijkstra<'a, K: Hash + Eq + Copy, G: Graph<K>> {
     g: &'a G,
@@ -74,7 +74,7 @@ impl<'a, K: Hash + Eq + Copy, G: Graph<K>> Dijkstra<'a, K, G> {
 #[cfg(test)]
 mod test {
     use super::Dijkstra;
-    use crate::network_struct::{Graph, StreamAwareGraph};
+    use crate::graph_util::{Graph, StreamAwareGraph};
     #[test]
     fn test_dijkstra1() -> Result<(), String> {
         let mut g = StreamAwareGraph::new();

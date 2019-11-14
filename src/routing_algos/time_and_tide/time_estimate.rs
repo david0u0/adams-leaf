@@ -1,5 +1,5 @@
 use super::super::{AVBType, Flow, FlowTable, GCL};
-use crate::network_struct::StreamAwareGraph;
+use crate::graph_util::StreamAwareGraph;
 
 /// AVB 資料流最多可以佔用的資源百分比（模擬 Credit Base Shaper 的效果）
 const MAX_AVB_SETTING: f64 = 0.75;
@@ -92,7 +92,7 @@ fn tt_interfere_avb_single_link(link_id: usize, wcd: f64, gcl: &GCL) -> u32 {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::network_struct::*;
+    use crate::graph_util::*;
     fn init_settings() -> (StreamAwareGraph, Vec<Flow>, FlowTable<usize>, GCL) {
         let mut g = StreamAwareGraph::new();
         g.add_host(Some(3));

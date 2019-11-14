@@ -1,6 +1,6 @@
 use super::time_and_tide::{compute_avb_latency, schedule_online};
 use super::{Flow, FlowTable, RoutingAlgo, GCL};
-use crate::network_struct::{Graph, StreamAwareGraph};
+use crate::graph_util::{Graph, StreamAwareGraph};
 use crate::util::Dijkstra;
 
 use crate::{W1, W2, W3};
