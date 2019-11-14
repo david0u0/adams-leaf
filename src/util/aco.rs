@@ -88,9 +88,9 @@ fn select_cluster(visibility: &[f64; MAX_K], pheromone: &[f64; MAX_K], k: usize,
     }
 }
 
-pub enum ShouldStopACO {
-    Yes(f64),
-    No(f64),
+pub enum ACOCostResult {
+    Stop(f64),
+    GoOn(f64),
 }
 
 pub struct ACO {
@@ -148,7 +148,7 @@ impl ACO {
         mut calculate_dist: F,
     ) -> State
     where
-        F: FnMut(&State) -> ShouldStopACO,
+        F: FnMut(&State) -> ACOCostResult,
     {
         let time = std::time::Instant::now();
         let mut best_state = WeightedState::new(std::f64::MAX, None);
@@ -176,7 +176,7 @@ impl ACO {
         calculate_dist: &mut F,
     ) -> (bool, WeightedState)
     where
-        F: FnMut(&State) -> ShouldStopACO,
+        F: FnMut(&State) -> ACOCostResult,
     {
         let mut max_heap: BinaryHeap<WeightedState> = BinaryHeap::new();
         let state_len = self.get_state_len();
@@ -189,10 +189,10 @@ impl ACO {
                 // TODO online pharamon update
             }
             match calculate_dist(&cur_state) {
-                ShouldStopACO::No(dist) => {
+                ACOCostResult::GoOn(dist) => {
                     max_heap.push(WeightedState::new(dist, Some(cur_state)));
                 }
-                ShouldStopACO::Yes(dist) => {
+                ACOCostResult::Stop(dist) => {
                     max_heap.push(WeightedState::new(dist, Some(cur_state)));
                     should_stop = true;
                     break;
@@ -265,7 +265,7 @@ impl ACO {
 mod test {
     use super::*;
     #[test]
-    fn test_ant_aco() {
+    fn test_aco() {
         let mut aco = ACO::new(0, 2, None);
         aco.extend_state_len(10);
         let new_state = aco.do_aco(50000, &vec![[1.0; MAX_K]; 10], |state| {
@@ -277,7 +277,7 @@ mod test {
                     cost -= s as f64;
                 }
             }
-            ShouldStopACO::No(cost / 6.0)
+            ACOCostResult::GoOn(cost / 6.0)
         });
         assert_eq!(vec![0, 1, 0, 1, 0, 1, 0, 1, 0, 1], new_state);
     }
