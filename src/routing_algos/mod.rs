@@ -97,7 +97,7 @@ impl Flow {
 pub trait RoutingAlgo {
     fn add_flows(&mut self, flows: Vec<Flow>);
     fn del_flows(&mut self, flows: Vec<Flow>);
-    fn get_retouted_flows(&self) -> &Vec<usize>;
+    fn get_rerouted_flows(&self) -> &Vec<usize>;
     fn get_route(&self, id: usize) -> &Vec<usize>;
     fn show_results(&self);
     fn get_last_compute_time(&self) -> u128;

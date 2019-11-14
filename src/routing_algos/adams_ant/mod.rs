@@ -78,7 +78,7 @@ impl<'a> RoutingAlgo for AdamsAnt<'a> {
     fn del_flows(&mut self, flows: Vec<Flow>) {
         unimplemented!();
     }
-    fn get_retouted_flows(&self) -> &Vec<usize> {
+    fn get_rerouted_flows(&self) -> &Vec<usize> {
         unimplemented!();
     }
     fn get_route(&self, id: usize) -> &Vec<usize> {

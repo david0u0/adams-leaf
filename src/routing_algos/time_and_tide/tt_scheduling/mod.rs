@@ -74,7 +74,7 @@ pub fn schedule_online<T: Clone, F: Fn(&Flow, &T) -> Links>(
 }
 
 /// 也可以當作離線排程算法來使用
-pub fn schedule_fixed_og<T: Clone, F: Fn(&Flow, &T) -> Links>(
+fn schedule_fixed_og<T: Clone, F: Fn(&Flow, &T) -> Links>(
     changed_table: &FT<T>,
     gcl: &mut GCL,
     get_links: F,

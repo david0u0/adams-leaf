@@ -82,7 +82,7 @@ fn tt_interfere_avb_single_link(link_id: usize, wcd: f64, gcl: &GCL) -> u32 {
                 break;
             }
             let gce_ptr_next = all_gce[j];
-            rem -= (gce_ptr_next.0 as i32 - (gce_ptr.0 + gce_ptr.1) as i32);
+            rem -= gce_ptr_next.0 as i32 - (gce_ptr.0 + gce_ptr.1) as i32;
         }
         i_max = std::cmp::max(i_max, i_cur);
     }
