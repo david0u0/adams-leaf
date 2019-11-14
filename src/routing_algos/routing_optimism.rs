@@ -91,7 +91,7 @@ impl<'a> RO<'a> {
                 *route_k = self.find_min_cost_route(flow, set);
                 unsafe {
                     // NOTE 把資料流的路徑與ID記憶到圖中
-                    self.save_flowid_on_edge(true, flow, *route_k);
+                    self.update_flowid_on_route(true, flow, *route_k);
                 }
             });
             // PHASE 2
@@ -151,7 +151,7 @@ impl<'a> RO<'a> {
             let old_route = *self.flow_table.get_info(target_id);
             // 從圖中忘記舊路徑
             unsafe {
-                self.save_flowid_on_edge(false, target_flow, old_route);
+                self.update_flowid_on_route(false, target_flow, old_route);
             }
             let new_route = self.find_min_cost_route(target_flow, None);
             let (fail_cnt, cost) = if old_route == new_route {
@@ -160,7 +160,7 @@ impl<'a> RO<'a> {
                 // 在圖中記憶新路徑
                 let _s = self as *const Self as *mut Self;
                 unsafe {
-                    self.save_flowid_on_edge(true, target_flow, new_route);
+                    self.update_flowid_on_route(true, target_flow, new_route);
                     (*_s).flow_table.update_info(target_id, new_route);
                 }
                 self.compute_all_avb_cost()
@@ -180,10 +180,10 @@ impl<'a> RO<'a> {
             } else {
                 // 恢復上一動
                 unsafe {
-                    self.save_flowid_on_edge(false, target_flow, new_route);
+                    self.update_flowid_on_route(false, target_flow, new_route);
                 }
                 unsafe {
-                    self.save_flowid_on_edge(true, target_flow, old_route);
+                    self.update_flowid_on_route(true, target_flow, old_route);
                 }
                 self.flow_table.update_info(target_id, old_route);
 
@@ -201,10 +201,10 @@ impl<'a> RO<'a> {
     fn get_candidate_count(&self, flow: &Flow) -> usize {
         self.yens_algo.get_route_count(*flow.src(), *flow.dst())
     }
-    unsafe fn save_flowid_on_edge(&self, remember: bool, flow: &Flow, k: usize) {
+    unsafe fn update_flowid_on_route(&self, remember: bool, flow: &Flow, k: usize) {
         let _g = &self.g as *const StreamAwareGraph as *mut StreamAwareGraph;
         let route = self.get_kth_route(flow, k);
-        (*_g).save_flowid_on_edge(remember, *flow.id(), route);
+        (*_g).update_flowid_on_route(remember, *flow.id(), route);
     }
 }
 impl<'a> RoutingAlgo for RO<'a> {
@@ -241,7 +241,7 @@ impl<'a> RoutingAlgo for RO<'a> {
         self.grasp(time);
         self.g.forget_all_flows();
         self.flow_table.foreach(true, |flow, r| unsafe {
-            self.save_flowid_on_edge(true, flow, *r);
+            self.update_flowid_on_route(true, flow, *r);
         });
 
         self.compute_time = init_time.elapsed().as_micros();

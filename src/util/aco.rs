@@ -88,7 +88,7 @@ fn select_cluster(visibility: &[f64; MAX_K], pheromone: &[f64; MAX_K], k: usize,
     }
 }
 
-pub enum ACOCostResult {
+pub enum ACOJudgeResult {
     Stop(f64),
     GoOn(f64),
 }
@@ -145,10 +145,10 @@ impl ACO {
         &mut self,
         time_limit: u128,
         visibility: &Vec<[f64; MAX_K]>,
-        mut calculate_dist: F,
+        mut judge_func: F,
     ) -> State
     where
-        F: FnMut(&State) -> ACOCostResult,
+        F: FnMut(&State) -> ACOJudgeResult,
     {
         let time = std::time::Instant::now();
         let mut best_state = WeightedState::new(std::f64::MAX, None);
@@ -156,7 +156,7 @@ impl ACO {
         while time.elapsed().as_micros() < time_limit {
             epoch += 1;
             let (should_stop, local_best_state) =
-                self.do_single_epoch(&visibility, &mut calculate_dist);
+                self.do_single_epoch(&visibility, &mut judge_func);
             if local_best_state.get_dist() < best_state.get_dist() {
                 best_state = local_best_state;
             }
@@ -173,10 +173,10 @@ impl ACO {
     fn do_single_epoch<F>(
         &mut self,
         visibility: &Vec<[f64; MAX_K]>,
-        calculate_dist: &mut F,
+        judge_func: &mut F,
     ) -> (bool, WeightedState)
     where
-        F: FnMut(&State) -> ACOCostResult,
+        F: FnMut(&State) -> ACOJudgeResult,
     {
         let mut max_heap: BinaryHeap<WeightedState> = BinaryHeap::new();
         let state_len = self.get_state_len();
@@ -188,11 +188,11 @@ impl ACO {
                 cur_state.push(next);
                 // TODO online pharamon update
             }
-            match calculate_dist(&cur_state) {
-                ACOCostResult::GoOn(dist) => {
+            match judge_func(&cur_state) {
+                ACOJudgeResult::GoOn(dist) => {
                     max_heap.push(WeightedState::new(dist, Some(cur_state)));
                 }
-                ACOCostResult::Stop(dist) => {
+                ACOJudgeResult::Stop(dist) => {
                     max_heap.push(WeightedState::new(dist, Some(cur_state)));
                     should_stop = true;
                     break;
@@ -277,7 +277,7 @@ mod test {
                     cost -= s as f64;
                 }
             }
-            ACOCostResult::GoOn(cost / 6.0)
+            ACOJudgeResult::GoOn(cost / 6.0)
         });
         assert_eq!(vec![0, 1, 0, 1, 0, 1, 0, 1, 0, 1], new_state);
     }

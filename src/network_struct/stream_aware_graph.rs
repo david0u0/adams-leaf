@@ -230,7 +230,7 @@ impl StreamAwareGraph {
     /// * `remember` - 布林值，記憶或是遺忘路徑
     /// * `flow_id` - 要記憶或遺忘的資料流ID
     /// * `route` - 該路徑(以節點組成)
-    pub fn save_flowid_on_edge(&mut self, remember: bool, flow_id: usize, route: &Vec<usize>) {
+    pub fn update_flowid_on_route(&mut self, remember: bool, flow_id: usize, route: &Vec<usize>) {
         for i in 0..route.len() - 1 {
             let (_, set, _) = self.edge_info.get_mut(&(route[i], route[i + 1])).unwrap();
             if remember {
@@ -291,8 +291,8 @@ mod test {
         let mut ans: Vec<Vec<usize>> = vec![vec![], vec![], vec![]];
         assert_eq!(ans, g.get_overlap_flows(&vec![0, 3, 2, 1]));
 
-        g.save_flowid_on_edge(true, 0, &vec![2, 3, 4]);
-        g.save_flowid_on_edge(true, 1, &vec![1, 0, 3, 4]);
+        g.update_flowid_on_route(true, 0, &vec![2, 3, 4]);
+        g.update_flowid_on_route(true, 1, &vec![1, 0, 3, 4]);
 
         assert_eq!(ans, g.get_overlap_flows(&vec![4, 3, 0, 1])); // 兩個方向不視為重疊
 
@@ -301,7 +301,7 @@ mod test {
         ov_flows[1].sort();
         assert_eq!(vec![0, 1], ov_flows[1]);
 
-        g.save_flowid_on_edge(false, 1, &vec![1, 0, 3, 4]);
+        g.update_flowid_on_route(false, 1, &vec![1, 0, 3, 4]);
         ans = vec![vec![], vec![0]];
         assert_eq!(ans, g.get_overlap_flows(&vec![0, 3, 4]));
 

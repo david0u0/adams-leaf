@@ -161,14 +161,14 @@ mod test {
     fn test_endtoend_avb_without_gcl() {
         let (mut g, flows, mut flow_table, gcl) = init_settings();
         flow_table.insert(vec![flows[0].clone()], 0);
-        g.save_flowid_on_edge(true, 0, &vec![0, 1, 2]);
+        g.update_flowid_on_route(true, 0, &vec![0, 1, 2]);
         assert_eq!(
             compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
             ((MAX_BE_SIZE / 100.0 + 1.0) * 2.0) as u32
         );
 
         flow_table.insert(vec![flows[1].clone()], 0);
-        g.save_flowid_on_edge(true, 1, &vec![0, 1, 2]);
+        g.update_flowid_on_route(true, 1, &vec![0, 1, 2]);
         assert_eq!(
             compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
             ((MAX_BE_SIZE / 100.0 + 1.0 + 2.0) * 2.0) as u32
@@ -180,9 +180,9 @@ mod test {
         let (mut g, flows, mut flow_table, mut gcl) = init_settings();
 
         flow_table.insert(vec![flows[0].clone()], 0);
-        g.save_flowid_on_edge(true, 0, &vec![0, 1, 2]);
+        g.update_flowid_on_route(true, 0, &vec![0, 1, 2]);
         flow_table.insert(vec![flows[1].clone()], 0);
-        g.save_flowid_on_edge(true, 1, &vec![0, 1, 2]);
+        g.update_flowid_on_route(true, 1, &vec![0, 1, 2]);
 
         gcl.insert_gate_evt(0, 99, 0, 0, 10);
         assert_eq!(

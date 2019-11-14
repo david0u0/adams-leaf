@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use super::{compute_all_avb_cost, AVBCostResult, AdamsAnt, FlowTable};
-use crate::util::aco::{ACOCostResult, ACO};
+use crate::util::aco::{ACOJudgeResult, ACO};
 use crate::{MAX_K, W1, W2, FAST_STOP};
 
 const TSN_MEMORY: f64 = 3.0; // 計算能見度時，TSN 對舊路徑的偏好程度
@@ -12,7 +12,7 @@ pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128, reconf: FlowTable<usize>) {
     let aco = &mut algo.aco as *mut ACO;
     algo.g.forget_all_flows();
     algo.flow_table.foreach(true, |flow, &route_k| unsafe {
-        algo.save_flowid_on_edge(true, *flow.id(), route_k);
+        algo.update_flowid_on_route(true, *flow.id(), route_k);
     });
 
     // 算好能見度再把新的 TT 排進去
@@ -30,9 +30,9 @@ pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128, reconf: FlowTable<usize>) {
         (*aco).do_aco(time_limit - time.elapsed().as_micros(), &vis, |state| {
             let res = compute_aco_dist(algo, state, &mut best_dist);
             if res.0 == 0 && FAST_STOP { // 找到可行解，且為快速終止模式
-                ACOCostResult::Stop(res.1)
+                ACOJudgeResult::Stop(res.1)
             } else {
-                ACOCostResult::GoOn(res.1)
+                ACOJudgeResult::GoOn(res.1)
             }
         })
     };
@@ -107,13 +107,13 @@ unsafe fn compute_aco_dist(
     for (id, &route_k) in state.iter().enumerate() {
         if table.check_flow_exist(id) {
             if table.get_flow(id).is_avb() {
-                algo.save_flowid_on_edge(true, id, route_k);
+                algo.update_flowid_on_route(true, id, route_k);
                 let old_route_k = *table.get_info(id);
                 if old_route_k != route_k {
                     // 資料流存在，且在蟻群算法途中發生改變
                     // FIXME 下面兩行應該要有效，但事實上卻達不到預期的效果
-                    //algo.save_flowid_on_edge(false, id, old_route_k);
-                    //algo.save_flowid_on_edge(true, id, route_k);
+                    //algo.update_flowid_on_route(false, id, old_route_k);
+                    //algo.update_flowid_on_route(true, id, route_k);
                     // TODO 透過只計算受影響的資料流來加速
                     table.update_info(id, route_k);
                 }

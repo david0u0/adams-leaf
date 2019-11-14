@@ -57,7 +57,7 @@ impl<'a> RoutingAlgo for SPF<'a> {
         self.flow_table.foreach(true, |flow, _| {
             let r = self.get_shortest_route(flow);
             unsafe {
-                (*_g).save_flowid_on_edge(true, *flow.id(), &r);
+                (*_g).update_flowid_on_route(true, *flow.id(), &r);
             }
         });
     }

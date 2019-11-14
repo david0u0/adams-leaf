@@ -62,10 +62,10 @@ impl<'a> AdamsAnt<'a> {
             })
         }
     }
-    unsafe fn save_flowid_on_edge(&self, remember: bool, flow_id: usize, k: usize) {
+    unsafe fn update_flowid_on_route(&self, remember: bool, flow_id: usize, k: usize) {
         let _g = &self.g as *const StreamAwareGraph as *mut StreamAwareGraph;
         let route = self.get_kth_route(flow_id, k);
-        (*_g).save_flowid_on_edge(remember, flow_id, route);
+        (*_g).update_flowid_on_route(remember, flow_id, route);
     }
 }
 
@@ -135,7 +135,7 @@ impl<'a> AdamsAnt<'a> {
         do_aco(self, t_limit, reconf);
         self.g.forget_all_flows();
         self.flow_table.foreach(true, |flow, r| unsafe {
-            self.save_flowid_on_edge(true, *flow.id(), *r)
+            self.update_flowid_on_route(true, *flow.id(), *r)
         });
     }
 }
