@@ -1,4 +1,5 @@
-use super::super::{AVBType, Flow, FlowTable, StreamAwareGraph, GCL};
+use super::super::{AVBType, Flow, FlowTable, GCL};
+use crate::network_struct::StreamAwareGraph;
 
 /// AVB 資料流最多可以佔用的資源百分比（模擬 Credit Base Shaper 的效果）
 const MAX_AVB_SETTING: f64 = 0.75;

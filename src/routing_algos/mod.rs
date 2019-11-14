@@ -103,9 +103,6 @@ pub trait RoutingAlgo {
     fn get_last_compute_time(&self) -> u128;
 }
 
-mod stream_aware_graph;
-pub use stream_aware_graph::StreamAwareGraph;
-
 mod shortest_path;
 pub use shortest_path::SPF;
 

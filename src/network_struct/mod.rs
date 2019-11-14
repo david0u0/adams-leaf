@@ -19,3 +19,6 @@ pub trait OnOffGraph<K: Hash + Eq>: Graph<K> {
     fn inactivate_node(&mut self, id: K) -> Result<(), String>;
     fn reset(&mut self);
 }
+
+mod stream_aware_graph;
+pub use stream_aware_graph::StreamAwareGraph;
