@@ -32,7 +32,7 @@ pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128, reconf: FlowTable<usize>) {
             if res.0 == 0 && FAST_STOP { // 找到可行解，且為快速終止模式
                 ACOJudgeResult::Stop(res.1)
             } else {
-                ACOJudgeResult::GoOn(res.1)
+                ACOJudgeResult::KeepOn(res.1)
             }
         })
     };

@@ -35,6 +35,7 @@ plot [][] "不同演算法之效能比較1.dat" \
 
 set output "不同演算法之效能比較2.eps"
 # Plotting
+set key right bottom Left reverse nobox
 plot [][] "不同演算法之效能比較2.dat" \
 	   u ($1):($2 / 1000) lt 1 pt 6 ps 2 t "RO", \
 	"" u ($1):($3 / 1000) lt 2 pt 7 ps 2 t "ACO", \

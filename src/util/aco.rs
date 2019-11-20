@@ -90,7 +90,7 @@ fn select_cluster(visibility: &[f64; MAX_K], pheromone: &[f64; MAX_K], k: usize,
 
 pub enum ACOJudgeResult {
     Stop(f64),
-    GoOn(f64),
+    KeepOn(f64),
 }
 
 pub struct ACO {
@@ -189,7 +189,7 @@ impl ACO {
                 // TODO online pharamon update
             }
             match judge_func(&cur_state) {
-                ACOJudgeResult::GoOn(dist) => {
+                ACOJudgeResult::KeepOn(dist) => {
                     max_heap.push(WeightedState::new(dist, Some(cur_state)));
                 }
                 ACOJudgeResult::Stop(dist) => {
@@ -277,7 +277,7 @@ mod test {
                     cost -= s as f64;
                 }
             }
-            ACOJudgeResult::GoOn(cost / 6.0)
+            ACOJudgeResult::KeepOn(cost / 6.0)
         });
         assert_eq!(vec![0, 1, 0, 1, 0, 1, 0, 1, 0, 1], new_state);
     }
