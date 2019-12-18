@@ -163,8 +163,8 @@ impl<T: Clone> FlowTable<T> {
                 self.apply_callback(self.get_avb(i), |flow, t| callback(flow, t));
             }
         } else {
-            for i in 0..self.infos.len() {
-                self.apply_callback(self.get_avb(i.into()), |flow, t| callback(flow, t));
+            for i in 0..self.arena.avbs.len() {
+                self.apply_callback(self.arena.avbs[i].as_ref(), |flow, t| callback(flow, t));
             }
         }
     }
@@ -181,8 +181,8 @@ impl<T: Clone> FlowTable<T> {
                 self.apply_callback(self.get_tsn(i), |flow, t| callback(flow, t));
             }
         } else {
-            for i in 0..self.infos.len() {
-                self.apply_callback(self.get_tsn(i.into()), |flow, t| callback(flow, t));
+            for i in 0..self.arena.tsns.len() {
+                self.apply_callback(self.arena.tsns[i].as_ref(), |flow, t| callback(flow, t));
             }
         }
     }
