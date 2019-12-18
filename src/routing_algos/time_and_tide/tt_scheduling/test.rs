@@ -1,4 +1,4 @@
-use super::super::super::{Flow, FlowTable, GCL};
+use super::super::super::{flow::TSNData, FlowTable, GCL};
 use super::*;
 
 type Info = Vec<(usize, f64)>;
@@ -27,49 +27,50 @@ fn gen_flow_table() -> FT {
     let mut ft = FlowTable::new();
     ft.insert(
         vec![
-            Flow::TT {
-                id: 0,
+            TSNFlow {
+                id: 0.into(),
                 src: 0,
                 dst: 4,
                 size: MTU,
                 period: 100,
                 max_delay: 100,
-                offset: 0,
+                spec_data: TSNData { offset: 0 },
             },
-            Flow::TT {
-                id: 1,
+            TSNFlow {
+                id: 0.into(),
                 src: 0,
                 dst: 5,
                 size: MTU * 3,
                 period: 150,
                 max_delay: 150,
-                offset: 0,
+                spec_data: TSNData { offset: 0 },
             },
-            Flow::TT {
-                id: 2,
+            TSNFlow {
+                id: 0.into(),
                 src: 0,
                 dst: 4,
                 size: MTU * 2,
                 period: 200,
                 max_delay: 200,
-                offset: 0,
+                spec_data: TSNData { offset: 0 },
             },
-            Flow::TT {
-                id: 3,
+            TSNFlow {
+                id: 0.into(),
                 src: 0,
                 dst: 4,
                 size: MTU * 3,
                 period: 300,
                 max_delay: 300,
-                offset: 0,
+                spec_data: TSNData { offset: 0 },
             },
         ],
         vec![],
+        vec![],
     );
-    ft.update_info(0, gen_links(vec![0, 4]));
-    ft.update_info(1, gen_links(vec![2, 6]));
-    ft.update_info(2, gen_links(vec![2, 6, 7]));
-    ft.update_info(3, gen_links(vec![1, 5, 6, 7]));
+    ft.update_info(0.into(), gen_links(vec![0, 4]));
+    ft.update_info(1.into(), gen_links(vec![2, 6]));
+    ft.update_info(2.into(), gen_links(vec![2, 6, 7]));
+    ft.update_info(3.into(), gen_links(vec![1, 5, 6, 7]));
     ft
 }
 
@@ -77,13 +78,13 @@ fn gen_flow_table() -> FT {
 fn simple_calculate_offset() {
     let gcl = GCL::new(60, 16);
     let ft = gen_flow_table();
-    let flow = ft.get_flow(0);
-    let links = ft.get_info(0);
+    let flow = ft.get_tsn(0.into()).unwrap();
+    let links = ft.get_info(0.into()).unwrap();
     let a = calculate_offsets(&flow, &vec![], links, &vec![0; 2], &gcl);
     assert_eq!(vec![0, 1], a);
 
-    let flow = ft.get_flow(2);
-    let links = ft.get_info(2);
+    let flow = ft.get_tsn(2.into()).unwrap();
+    let links = ft.get_info(2.into()).unwrap();
     let a = calculate_offsets(&flow, &vec![], links, &vec![0; 3], &gcl);
     assert_eq!(vec![0, 1, 2], a);
 }

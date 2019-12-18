@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::graph_util::{Graph, OnOffGraph};
+use crate::routing_algos::flow::FlowID;
 
 struct Node {
     is_switch: bool,
@@ -30,7 +31,7 @@ pub struct StreamAwareGraph {
     cur_edge_id: usize,
     inactive_edges: Vec<(usize, usize)>,
     inactive_nodes: Vec<usize>,
-    edge_info: HashMap<(usize, usize), (usize, HashSet<usize>, f64)>,
+    edge_info: HashMap<(usize, usize), (usize, HashSet<FlowID>, f64)>,
 }
 impl StreamAwareGraph {
     fn _add_node(&mut self, cnt: Option<usize>, is_switch: bool) -> Vec<usize> {
@@ -91,7 +92,7 @@ impl StreamAwareGraph {
         }
     }
     pub fn new() -> Self {
-        return StreamAwareGraph {
+        StreamAwareGraph {
             nodes: vec![],
             node_cnt: 0,
             edge_cnt: 0,
@@ -99,7 +100,7 @@ impl StreamAwareGraph {
             inactive_edges: vec![],
             inactive_nodes: vec![],
             edge_info: HashMap::new(),
-        };
+        }
     }
 }
 impl Graph<usize> for StreamAwareGraph {
@@ -230,7 +231,7 @@ impl StreamAwareGraph {
     /// * `remember` - 布林值，記憶或是遺忘路徑
     /// * `flow_id` - 要記憶或遺忘的資料流ID
     /// * `route` - 該路徑(以節點組成)
-    pub fn update_flowid_on_route(&mut self, remember: bool, flow_id: usize, route: &Vec<usize>) {
+    pub fn update_flowid_on_route(&mut self, remember: bool, flow_id: FlowID, route: &Vec<usize>) {
         for i in 0..route.len() - 1 {
             let (_, set, _) = self.edge_info.get_mut(&(route[i], route[i + 1])).unwrap();
             if remember {
@@ -249,7 +250,7 @@ impl StreamAwareGraph {
     /// 詢問一條路徑上所有共用過邊的資料流。針對路上每個邊都會回傳一個陣列，內含走了這個邊的資料流（空陣列代表無人走過）
     ///
     /// __注意：方向不同者不視為共用！__
-    pub fn get_overlap_flows(&self, route: &Vec<usize>) -> Vec<Vec<usize>> {
+    pub fn get_overlap_flows(&self, route: &Vec<usize>) -> Vec<Vec<FlowID>> {
         // TODO 回傳的 Vec<Vec> 有優化空間
         let mut ret = Vec::with_capacity(route.len() - 1);
         for i in 0..route.len() - 1 {
@@ -277,6 +278,9 @@ impl StreamAwareGraph {
 #[cfg(test)]
 mod test {
     use super::*;
+    fn build_id_vec(v: Vec<usize>) -> Vec<FlowID> {
+        v.into_iter().map(|i| i.into()).collect()
+    }
     #[test]
     fn test_remember_forget_flow() -> Result<(), String> {
         let mut g = StreamAwareGraph::new();
@@ -288,21 +292,21 @@ mod test {
         g.add_edge((0, 4), 2.0)?;
         g.add_edge((3, 4), 2.0)?;
 
-        let mut ans: Vec<Vec<usize>> = vec![vec![], vec![], vec![]];
+        let mut ans: Vec<Vec<FlowID>> = vec![vec![], vec![], vec![]];
         assert_eq!(ans, g.get_overlap_flows(&vec![0, 3, 2, 1]));
 
-        g.update_flowid_on_route(true, 0, &vec![2, 3, 4]);
-        g.update_flowid_on_route(true, 1, &vec![1, 0, 3, 4]);
+        g.update_flowid_on_route(true, 0.into(), &vec![2, 3, 4]);
+        g.update_flowid_on_route(true, 1.into(), &vec![1, 0, 3, 4]);
 
         assert_eq!(ans, g.get_overlap_flows(&vec![4, 3, 0, 1])); // 兩個方向不視為重疊
 
         let mut ov_flows = g.get_overlap_flows(&vec![0, 3, 4]);
-        assert_eq!(vec![1], ov_flows[0]);
+        assert_eq!(build_id_vec(vec![1]), ov_flows[0]);
         ov_flows[1].sort();
-        assert_eq!(vec![0, 1], ov_flows[1]);
+        assert_eq!(build_id_vec(vec![0, 1]), ov_flows[1]);
 
-        g.update_flowid_on_route(false, 1, &vec![1, 0, 3, 4]);
-        ans = vec![vec![], vec![0]];
+        g.update_flowid_on_route(false, 1.into(), &vec![1, 0, 3, 4]);
+        ans = vec![vec![], vec![0.into()]];
         assert_eq!(ans, g.get_overlap_flows(&vec![0, 3, 4]));
 
         g.forget_all_flows();

@@ -15,46 +15,49 @@ pub const W3: f64 = 1.0;
 
 pub const FAST_STOP: bool = true;
 
-use routing_algos::{AVBType, Flow};
+use routing_algos::{flow, AVBFlow, TSNFlow};
 
-pub fn read_flows_from_file(base_id: usize, file_name: &str, times: usize) -> Vec<Flow> {
-    let mut flows = Vec::<Flow>::new();
+pub fn read_flows_from_file(file_name: &str, times: usize) -> (Vec<TSNFlow>, Vec<AVBFlow>) {
+    let mut tsns = Vec::<TSNFlow>::new();
+    let mut avbs = Vec::<AVBFlow>::new();
     for _ in 0..times {
-        read_flows_from_file_once(&mut flows, base_id, file_name);
+        read_flows_from_file_once(&mut tsns, &mut avbs, file_name);
     }
-    flows
+    (tsns, avbs)
 }
-fn read_flows_from_file_once(flows: &mut Vec<Flow>, base_id: usize, file_name: &str) {
+fn read_flows_from_file_once(tsns: &mut Vec<TSNFlow>, avbs: &mut Vec<AVBFlow>, file_name: &str) {
     let txt = fs::read_to_string(file_name).expect(&format!("找不到檔案: {}", file_name));
     let all_flows: AllFlows =
         serde_json::from_str(&txt).expect(&format!("無法解析檔案: {}", file_name));
-    for flow in all_flows.tt_flows.iter() {
-        flows.push(Flow::TT {
-            id: flows.len() + base_id,
-            size: flow.size,
-            src: flow.src,
-            dst: flow.dst,
-            period: flow.period,
-            max_delay: flow.max_delay,
-            offset: flow.offset,
+    for cur_flow in all_flows.tt_flows.iter() {
+        tsns.push(flow::Flow {
+            id: 0.into(),
+            size: cur_flow.size,
+            src: cur_flow.src,
+            dst: cur_flow.dst,
+            period: cur_flow.period,
+            max_delay: cur_flow.max_delay,
+            spec_data: flow::TSNData {
+                offset: cur_flow.offset,
+            },
         });
     }
-    for flow in all_flows.avb_flows.iter() {
-        flows.push(Flow::AVB {
-            id: flows.len() + base_id,
-            size: flow.size,
-            src: flow.src,
-            dst: flow.dst,
-            period: flow.period,
-            max_delay: flow.max_delay,
-            avb_type: {
-                if flow.avb_type == 'A' {
-                    AVBType::new_type_a()
-                } else if flow.avb_type == 'B' {
-                    AVBType::new_type_b()
+    for cur_flow in all_flows.avb_flows.iter() {
+        avbs.push(flow::Flow {
+            id: 0.into(),
+            size: cur_flow.size,
+            src: cur_flow.src,
+            dst: cur_flow.dst,
+            period: cur_flow.period,
+            max_delay: cur_flow.max_delay,
+            spec_data: flow::AVBData {
+                avb_class: if cur_flow.avb_type == 'A' {
+                    flow::AVBClass::A
+                } else if cur_flow.avb_type == 'B' {
+                    flow::AVBClass::A
                 } else {
                     panic!("AVB type 必需為 `A` 或 `B`");
-                }
+                },
             },
         });
     }
@@ -69,18 +72,18 @@ pub fn read_topo_from_file(file_name: &str) -> graph_util::StreamAwareGraph {
     g.add_host(Some(json.host_cnt));
     g.add_switch(Some(json.switch_cnt));
     for (n1, n2, bandwidth) in json.edges.into_iter() {
-        g.add_edge((n1, n2), bandwidth);
+        g.add_edge((n1, n2), bandwidth).expect("插入邊失敗");
     }
     g
 }
 
 #[derive(Serialize, Deserialize)]
 struct AllFlows {
-    tt_flows: Vec<TTFlow>,
-    avb_flows: Vec<AVBFlow>,
+    tt_flows: Vec<RawTSNFlow>,
+    avb_flows: Vec<RawAVBFlow>,
 }
 #[derive(Serialize, Deserialize)]
-struct TTFlow {
+struct RawTSNFlow {
     size: usize,
     src: usize,
     dst: usize,
@@ -89,7 +92,7 @@ struct TTFlow {
     offset: u32,
 }
 #[derive(Serialize, Deserialize)]
-struct AVBFlow {
+struct RawAVBFlow {
     size: usize,
     src: usize,
     dst: usize,

@@ -1,5 +1,6 @@
-use super::super::{AVBType, Flow, FlowTable, GCL};
+use super::super::{flow, AVBFlow, FlowTable, TSNFlow, GCL};
 use crate::graph_util::StreamAwareGraph;
+use flow::{AVBClass, FlowID};
 
 /// AVB 資料流最多可以佔用的資源百分比（模擬 Credit Base Shaper 的效果）
 const MAX_AVB_SETTING: f64 = 0.75;
@@ -13,41 +14,33 @@ const MAX_BE_SIZE: f64 = 1500.0;
 /// * `gcl` - 所有 TT 資料流的 Gate Control List
 pub fn compute_avb_latency<T: Clone>(
     g: &StreamAwareGraph,
-    flow: &Flow,
+    flow: &AVBFlow,
     route: &Vec<usize>,
     flow_table: &FlowTable<T>,
     gcl: &GCL,
 ) -> u32 {
-    if let Flow::AVB {
-        id, size, avb_type, ..
-    } = flow
-    {
-        let overlap_flow_id = g.get_overlap_flows(route);
-        let mut end_to_end_lanency = 0.0;
-        for (i, (link_id, bandwidth)) in g.get_links_id_bandwidth(route).into_iter().enumerate() {
-            let wcd = wcd_on_single_link(
-                *id,
-                *size,
-                *avb_type,
-                bandwidth,
-                flow_table,
-                &overlap_flow_id[i],
-            );
-            end_to_end_lanency +=
-                wcd + tt_interfere_avb_single_link(link_id, wcd as f64, gcl) as f64;
-        }
-        end_to_end_lanency as u32
-    } else {
-        panic!("並非 AVB 資料流！");
+    let overlap_flow_id = g.get_overlap_flows(route);
+    let mut end_to_end_lanency = 0.0;
+    for (i, (link_id, bandwidth)) in g.get_links_id_bandwidth(route).into_iter().enumerate() {
+        let wcd = wcd_on_single_link(
+            flow.id,
+            flow.size,
+            flow.spec_data.avb_class,
+            bandwidth,
+            flow_table,
+            &overlap_flow_id[i],
+        );
+        end_to_end_lanency += wcd + tt_interfere_avb_single_link(link_id, wcd as f64, gcl) as f64;
     }
+    end_to_end_lanency as u32
 }
 fn wcd_on_single_link<T: Clone>(
-    id: usize,
+    id: FlowID,
     size: usize,
-    self_type: AVBType,
+    self_type: AVBClass,
     bandwidth: f64,
     flow_table: &FlowTable<T>,
-    overlap_flow_id: &Vec<usize>,
+    overlap_flow_id: &Vec<FlowID>,
 ) -> f64 {
     let mut wcd = 0.0;
     // MAX None AVB
@@ -59,10 +52,9 @@ fn wcd_on_single_link<T: Clone>(
     // Ohter AVB
     for &flow_id in overlap_flow_id.iter() {
         if flow_id != id {
-            if let Flow::AVB { size, avb_type, .. } = flow_table.get_flow(flow_id) {
-                if self_type.is_type_b() || avb_type.is_type_a() {
-                    wcd += *size as f64 / bandwidth;
-                }
+            let flow = flow_table.get_avb(flow_id).unwrap();
+            if self_type.is_class_b() || flow.spec_data.avb_class.is_class_a() {
+                wcd += flow.size as f64 / bandwidth;
             }
         }
     }
@@ -91,84 +83,122 @@ fn tt_interfere_avb_single_link(link_id: usize, wcd: f64, gcl: &GCL) -> u32 {
 
 #[cfg(test)]
 mod test {
+    use super::super::super::flow::AVBData;
     use super::*;
     use crate::graph_util::*;
-    fn init_settings() -> (StreamAwareGraph, Vec<Flow>, FlowTable<usize>, GCL) {
+    fn init_settings() -> (StreamAwareGraph, Vec<AVBFlow>, FlowTable<usize>, GCL) {
         let mut g = StreamAwareGraph::new();
         g.add_host(Some(3));
         g.add_edge((0, 1), 100.0).unwrap();
         g.add_edge((1, 2), 100.0).unwrap();
         let flows = vec![
-            Flow::AVB {
-                id: 0,
+            AVBFlow {
+                id: 0.into(),
                 src: 0,
                 dst: 2,
                 size: 75,
                 period: 10000,
                 max_delay: 200,
-                avb_type: AVBType::new_type_a(),
+                spec_data: AVBData {
+                    avb_class: AVBClass::A,
+                },
             },
-            Flow::AVB {
-                id: 1,
+            AVBFlow {
+                id: 0.into(),
                 src: 0,
                 dst: 2,
                 size: 150,
                 period: 10000,
                 max_delay: 200,
-                avb_type: AVBType::new_type_a(),
+                spec_data: AVBData {
+                    avb_class: AVBClass::A,
+                },
             },
-            Flow::AVB {
-                id: 2,
+            AVBFlow {
+                id: 0.into(),
                 src: 0,
                 dst: 2,
                 size: 75,
                 period: 10000,
                 max_delay: 200,
-                avb_type: AVBType::new_type_b(),
+                spec_data: AVBData {
+                    avb_class: AVBClass::B,
+                },
             },
         ];
         let flow_table = FlowTable::new();
         let gcl = GCL::new(10, g.get_edge_cnt());
         (g, flows, flow_table, gcl)
     }
+    fn build_flowid_vec(v: Vec<usize>) -> Vec<FlowID> {
+        v.into_iter().map(|i| i.into()).collect()
+    }
     #[test]
     fn test_single_link_avb() {
         let (_, flows, mut route_table, _) = init_settings();
-        let type_a = AVBType::new_type_a();
-        let type_b = AVBType::new_type_b();
+        let class_a = AVBClass::A;
+        let class_b = AVBClass::B;
 
-        route_table.insert(flows, 0);
+        route_table.insert(vec![], flows, 0);
 
         assert_eq!(
-            wcd_on_single_link(0, 75, type_a, 100.0, &route_table, &vec![0, 2]),
+            wcd_on_single_link(
+                0.into(),
+                75,
+                class_a,
+                100.0,
+                &route_table,
+                &build_flowid_vec(vec![0, 2])
+            ),
             (MAX_BE_SIZE / 100.0 + 1.0)
         );
         assert_eq!(
-            wcd_on_single_link(0, 75, type_a, 100.0, &route_table, &vec![1, 0, 2]),
+            wcd_on_single_link(
+                0.into(),
+                75,
+                class_a,
+                100.0,
+                &route_table,
+                &build_flowid_vec(vec![1, 0, 2])
+            ),
             (MAX_BE_SIZE / 100.0 + 1.0 + 2.0)
         );
         assert_eq!(
-            wcd_on_single_link(1, 150, type_a, 100.0, &route_table, &vec![1, 0, 2]),
+            wcd_on_single_link(
+                1.into(),
+                150,
+                class_a,
+                100.0,
+                &route_table,
+                &build_flowid_vec(vec![1, 0, 2])
+            ),
             (MAX_BE_SIZE / 100.0 + 1.0 + 2.0)
         );
 
         assert_eq!(
-            wcd_on_single_link(2, 75, type_b, 100.0, &route_table, &vec![1, 0, 2]),
+            wcd_on_single_link(
+                2.into(),
+                75,
+                class_b,
+                100.0,
+                &route_table,
+                &build_flowid_vec(vec![1, 0, 2])
+            ),
             (MAX_BE_SIZE / 100.0 + 1.0 + 2.0 + 1.0)
         );
     }
     #[test]
     fn test_endtoend_avb_without_gcl() {
         let (mut g, flows, mut flow_table, gcl) = init_settings();
-        flow_table.insert(vec![flows[0].clone()], 0);
-        g.update_flowid_on_route(true, 0, &vec![0, 1, 2]);
+        flow_table.insert(vec![], vec![flows[0].clone()], 0);
+        g.update_flowid_on_route(true, 0.into(), &vec![0, 1, 2]);
         assert_eq!(
             compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
             ((MAX_BE_SIZE / 100.0 + 1.0) * 2.0) as u32
         );
 
-        flow_table.insert(vec![flows[1].clone()], 0);
-        g.update_flowid_on_route(true, 1, &vec![0, 1, 2]);
+        flow_table.insert(vec![], vec![flows[1].clone()], 0);
+        g.update_flowid_on_route(true, 1.into(), &vec![0, 1, 2]);
         assert_eq!(
             compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
             ((MAX_BE_SIZE / 100.0 + 1.0 + 2.0) * 2.0) as u32
@@ -179,38 +209,78 @@ mod test {
         // 其實已經接近整合測試了 @@
         let (mut g, flows, mut flow_table, mut gcl) = init_settings();
 
-        flow_table.insert(vec![flows[0].clone()], 0);
-        g.update_flowid_on_route(true, 0, &vec![0, 1, 2]);
-        flow_table.insert(vec![flows[1].clone()], 0);
-        g.update_flowid_on_route(true, 1, &vec![0, 1, 2]);
+        flow_table.insert(vec![], vec![flows[0].clone()], 0);
+        g.update_flowid_on_route(true, 0.into(), &vec![0, 1, 2]);
+        flow_table.insert(vec![], vec![flows[1].clone()], 0);
+        g.update_flowid_on_route(true, 1.into(), &vec![0, 1, 2]);
 
-        gcl.insert_gate_evt(0, 99, 0, 0, 10);
+        gcl.insert_gate_evt(0, 99.into(), 0, 0, 10);
         assert_eq!(
-            compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
+            compute_avb_latency(
+                &g,
+                flow_table.get_avb(0.into()).unwrap(),
+                &vec![0, 1, 2],
+                &flow_table,
+                &gcl
+            ),
             ((MAX_BE_SIZE / 100.0 + 1.0 + 2.0) * 2.0 + 10.0) as u32
         );
 
-        gcl.insert_gate_evt(0, 99, 0, 15, 5);
+        gcl.insert_gate_evt(0, 99.into(), 0, 15, 5);
         assert_eq!(
-            compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
+            compute_avb_latency(
+                &g,
+                flow_table.get_avb(0.into()).unwrap(),
+                &vec![0, 1, 2],
+                &flow_table,
+                &gcl
+            ),
             ((MAX_BE_SIZE / 100.0 + 1.0 + 2.0) * 2.0 + 15.0) as u32
         );
 
-        gcl.insert_gate_evt(2, 99, 0, 100, 100);
+        gcl.insert_gate_evt(2, 99.into(), 0, 100, 100);
         // 雖然這個關閉事件跟前面兩個不可能同時發生，但為了計算快速，還是假裝全部都發生了
         assert_eq!(
-            compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
+            compute_avb_latency(
+                &g,
+                flow_table.get_avb(0.into()).unwrap(),
+                &vec![0, 1, 2],
+                &flow_table,
+                &gcl
+            ),
             ((MAX_BE_SIZE / 100.0 + 1.0 + 2.0) * 2.0 + 115.0) as u32
         );
+        assert_eq!(
+            compute_avb_latency(
+                &g,
+                flow_table.get_avb(1.into()).unwrap(),
+                &vec![0, 1, 2],
+                &flow_table,
+                &gcl
+            ),
+            ((MAX_BE_SIZE / 100.0 + 2.0 + 1.0) * 2.0 + 115.0) as u32
+        );
 
-        gcl.insert_gate_evt(0, 99, 0, 100, 100);
+        gcl.insert_gate_evt(0, 99.into(), 0, 100, 100);
         // 這個事件與同個埠口上的前兩個事件不可能同時發生，選比較久的（即這個事件）
         assert_eq!(
-            compute_avb_latency(&g, &flows[0], &vec![0, 1, 2], &flow_table, &gcl),
+            compute_avb_latency(
+                &g,
+                flow_table.get_avb(0.into()).unwrap(),
+                &vec![0, 1, 2],
+                &flow_table,
+                &gcl
+            ),
             ((MAX_BE_SIZE / 100.0 + 1.0 + 2.0) * 2.0 + 200.0) as u32
         );
         assert_eq!(
-            compute_avb_latency(&g, &flows[1], &vec![0, 1, 2], &flow_table, &gcl),
+            compute_avb_latency(
+                &g,
+                flow_table.get_avb(1.into()).unwrap(),
+                &vec![0, 1, 2],
+                &flow_table,
+                &gcl
+            ),
             ((MAX_BE_SIZE / 100.0 + 2.0 + 1.0) * 2.0 + 200.0) as u32
         );
     }

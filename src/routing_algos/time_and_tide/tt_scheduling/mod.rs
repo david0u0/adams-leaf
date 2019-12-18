@@ -1,4 +1,4 @@
-use super::super::{Flow, FlowTable as FT, GCL};
+use super::super::{flow::FlowID, FlowTable as FT, TSNFlow, GCL};
 use crate::MAX_QUEUE;
 
 type Links = Vec<(usize, f64)>;
@@ -20,27 +20,27 @@ use std::cmp::Ordering;
 /// * `deadline` - 時間較緊的要排前面
 /// * `period` - 週期短的要排前面
 /// * `route length` - 路徑長的要排前面
-fn cmp_flow<T: Clone, F: Fn(&Flow, &T) -> Links>(
-    id1: usize,
-    id2: usize,
+fn cmp_flow<T: Clone, F: Fn(&TSNFlow, &T) -> Links>(
+    id1: FlowID,
+    id2: FlowID,
     table: &FT<T>,
     get_links: F,
 ) -> Ordering {
-    let flow1 = table.get_flow(id1);
-    let flow2 = table.get_flow(id2);
-    if flow1.max_delay() < flow2.max_delay() {
+    let flow1 = table.get_tsn(id1).unwrap();
+    let flow2 = table.get_tsn(id2).unwrap();
+    if flow1.max_delay < flow2.max_delay {
         Ordering::Less
-    } else if flow1.max_delay() > flow2.max_delay() {
+    } else if flow1.max_delay > flow2.max_delay {
         Ordering::Greater
     } else {
-        if flow1.period() < flow2.period() {
+        if flow1.period < flow2.period {
             Ordering::Less
-        } else if flow1.period() > flow2.period() {
+        } else if flow1.period > flow2.period {
             Ordering::Greater
         } else {
-            let k = table.get_info(*flow1.id());
+            let k = table.get_info(flow1.id).unwrap();
             let rlen_1 = get_links(&flow1, k).len();
-            let k = table.get_info(*flow2.id());
+            let k = table.get_info(flow2.id).unwrap();
             let rlen_2 = get_links(&flow2, k).len();
             if rlen_1 > rlen_2 {
                 Ordering::Less
@@ -56,7 +56,7 @@ fn cmp_flow<T: Clone, F: Fn(&Flow, &T) -> Links>(
 /// * `changed_table` - 被改動到的那部份資料流，包含新增與換路徑
 /// * `gcl` - 本來的 Gate Control List
 /// * 回傳 - Ok(false) 代表沒事發生，Ok(true) 代表發生大洗牌
-pub fn schedule_online<T: Clone, F: Fn(&Flow, &T) -> Links>(
+pub fn schedule_online<T: Clone, F: Fn(&TSNFlow, &T) -> Links>(
     og_table: &mut FT<T>,
     changed_table: &FT<T>,
     gcl: &mut GCL,
@@ -66,7 +66,7 @@ pub fn schedule_online<T: Clone, F: Fn(&Flow, &T) -> Links>(
     og_table.union(false, &changed_table);
     if !result.is_ok() {
         gcl.clear();
-        schedule_fixed_og(og_table, gcl, |f: &Flow, t: &T| get_links(f, t))?;
+        schedule_fixed_og(og_table, gcl, |f, t| get_links(f, t))?;
         Ok(true)
     } else {
         Ok(false)
@@ -74,25 +74,23 @@ pub fn schedule_online<T: Clone, F: Fn(&Flow, &T) -> Links>(
 }
 
 /// 也可以當作離線排程算法來使用
-fn schedule_fixed_og<T: Clone, F: Fn(&Flow, &T) -> Links>(
+fn schedule_fixed_og<T: Clone, F: Fn(&TSNFlow, &T) -> Links>(
     changed_table: &FT<T>,
     gcl: &mut GCL,
     get_links: F,
 ) -> Result<(), ()> {
-    let mut tt_flows = Vec::<usize>::new();
-    changed_table.foreach(false, |flow, _| {
-        if flow.is_tt() {
-            tt_flows.push(*flow.id());
-        }
+    let mut tsn_ids = Vec::<FlowID>::new();
+    changed_table.foreach_tsn(|flow, _| {
+        tsn_ids.push(flow.id);
     });
-    tt_flows.sort_by(|&id1, &id2| cmp_flow(id1, id2, changed_table, |f, t| get_links(f, t)));
-    for flow_id in tt_flows.into_iter() {
-        let flow = changed_table.get_flow(flow_id);
-        let links = get_links(flow, changed_table.get_info(flow_id));
+    tsn_ids.sort_by(|&id1, &id2| cmp_flow(id1, id2, changed_table, |f, t| get_links(f, t)));
+    for flow_id in tsn_ids.into_iter() {
+        let flow = changed_table.get_tsn(flow_id).unwrap();
+        let links = get_links(flow, changed_table.get_info(flow_id).unwrap());
         let mut all_offsets: Vec<Vec<u32>> = vec![];
         // NOTE 一個資料流的每個封包，在單一埠口上必需採用同一個佇列
         let mut ro: Vec<u8> = vec![0; links.len()];
-        let k = get_frame_cnt(*flow.size());
+        let k = get_frame_cnt(flow.size);
         let mut m = 0;
         while m < k {
             let offsets = calculate_offsets(flow, &all_offsets, &links, &ro, gcl);
@@ -113,7 +111,7 @@ fn schedule_fixed_og<T: Clone, F: Fn(&Flow, &T) -> Links>(
             let trans_time = ((MTU as f64) / links[i].1).ceil() as u32;
             gcl.set_queueid(queue_id, link_id, flow_id);
             // 考慮 hyper period 中每個狀況
-            let p = *flow.period() as usize;
+            let p = flow.period as usize;
             for time_shift in (0..gcl.get_hyper_p()).step_by(p) {
                 for m in 0..k {
                     // insert gate evt
@@ -126,7 +124,7 @@ fn schedule_fixed_og<T: Clone, F: Fn(&Flow, &T) -> Links>(
                     );
                     // insert queue evt
                     let queue_evt_start = if i == 0 {
-                        flow.offset()
+                        flow.spec_data.offset
                     } else {
                         all_offsets[m][i - 1] // 前一個埠口一開始傳即視為開始佔用
                     };
@@ -149,7 +147,7 @@ fn schedule_fixed_og<T: Clone, F: Fn(&Flow, &T) -> Links>(
 
 /// 回傳值為為一個陣列，若其長度小於路徑長，代表排一排爆開
 fn calculate_offsets(
-    flow: &Flow,
+    flow: &TSNFlow,
     all_offsets: &Vec<Vec<u32>>,
     links: &Vec<(usize, f64)>,
     ro: &Vec<u8>,
@@ -163,7 +161,7 @@ fn calculate_offsets(
             // 路徑起始
             if all_offsets.len() == 0 {
                 // 資料流的第一個封包
-                flow.offset()
+                flow.spec_data.offset
             } else {
                 // #m-1 封包完整送出，且經過處理時間
                 all_offsets[all_offsets.len() - 1][i] + trans_time
@@ -184,7 +182,7 @@ fn calculate_offsets(
             }
         };
         let mut cur_offset = arrive_time;
-        let p = *flow.period() as usize;
+        let p = flow.period as usize;
         for time_shift in (0..hyper_p).step_by(p) {
             // 考慮 hyper period 中每種狀況
             /*
@@ -245,8 +243,8 @@ fn assign_new_queues(ro: &mut Vec<u8>) -> Result<(), ()> {
 }
 
 #[inline(always)]
-fn miss_deadline(cur_offset: u32, trans_time: u32, flow: &Flow) -> bool {
-    if cur_offset + trans_time >= flow.offset() + *flow.max_delay() {
+fn miss_deadline(cur_offset: u32, trans_time: u32, flow: &TSNFlow) -> bool {
+    if cur_offset + trans_time >= flow.spec_data.offset + flow.max_delay {
         // 死線爆炸！
         true
     } else {
