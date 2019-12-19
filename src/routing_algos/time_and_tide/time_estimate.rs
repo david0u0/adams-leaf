@@ -1,4 +1,4 @@
-use super::super::{flow, AVBFlow, FlowTable, TSNFlow, GCL};
+use super::super::{flow, flow_table_prelude::*, AVBFlow, GCL};
 use crate::graph_util::StreamAwareGraph;
 use flow::{AVBClass, FlowID};
 

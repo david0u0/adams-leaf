@@ -1,6 +1,7 @@
-use super::super::{flow::FlowID, FlowTable as FT, TSNFlow, GCL};
+use super::super::{flow::FlowID, flow_table_prelude::*, TSNFlow, GCL};
 use crate::MAX_QUEUE;
 
+type FT<T> = FlowTable<T>;
 type Links = Vec<(usize, f64)>;
 
 const MTU: usize = 1500;

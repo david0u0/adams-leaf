@@ -1,5 +1,5 @@
-use super::super::time_and_tide::compute_avb_latency;
-use super::{AVBFlow, AdamsAnt, FlowTable, GCL};
+use super::super::{flow_table_prelude::*, time_and_tide::compute_avb_latency};
+use super::{AVBFlow, AdamsAnt, GCL};
 
 type FT = FlowTable<usize>;
 

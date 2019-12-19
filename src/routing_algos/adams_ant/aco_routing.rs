@@ -1,6 +1,7 @@
 use std::time::Instant;
 
-use super::{compute_all_avb_cost, AVBCostResult, AdamsAnt, FlowID, FlowTable};
+use super::super::flow_table_prelude::*;
+use super::{compute_all_avb_cost, AVBCostResult, AdamsAnt, FlowID};
 use crate::util::aco::{ACOJudgeResult, ACO};
 use crate::{FAST_STOP, MAX_K, W1, W2};
 

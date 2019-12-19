@@ -1,4 +1,4 @@
-use super::super::super::{flow::TSNData, FlowTable, GCL};
+use super::super::super::{flow::TSNData, flow_table_prelude::*, GCL};
 use super::*;
 
 type Info = Vec<(usize, f64)>;

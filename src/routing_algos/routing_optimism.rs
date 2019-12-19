@@ -2,7 +2,7 @@ use rand::Rng;
 use std::time::Instant;
 
 use super::time_and_tide::{compute_avb_latency, schedule_online};
-use super::{flow::Flow, flow::FlowID, AVBFlow, FlowTable, RoutingAlgo, TSNFlow, GCL};
+use super::{flow::Flow, flow::FlowID, flow_table_prelude::*, AVBFlow, RoutingAlgo, TSNFlow, GCL};
 use crate::graph_util::{Graph, StreamAwareGraph};
 use crate::util::YensAlgo;
 use crate::{FAST_STOP, W1, W2, W3};

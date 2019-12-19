@@ -17,7 +17,7 @@ mod routing_optimism;
 pub use routing_optimism::RO;
 
 mod recorder;
-pub use recorder::{FlowTable, GCL};
+pub use recorder::{flow_table_prelude, GCL};
 
 pub(self) mod time_and_tide;
 

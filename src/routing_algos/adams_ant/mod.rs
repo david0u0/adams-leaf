@@ -3,7 +3,8 @@ use std::time::Instant;
 use super::time_and_tide::schedule_online;
 use super::{
     flow::{Flow, FlowID},
-    AVBFlow, FlowTable, RoutingAlgo, TSNFlow, GCL,
+    flow_table_prelude::*,
+    AVBFlow, RoutingAlgo, TSNFlow, GCL,
 };
 use crate::graph_util::{Graph, StreamAwareGraph};
 use crate::util::aco::ACO;
