@@ -5,6 +5,11 @@ impl From<usize> for FlowID {
         FlowID(i)
     }
 }
+impl Into<usize> for FlowID {
+    fn into(self) -> usize {
+        self.0
+    }
+}
 
 #[derive(Clone, Copy, Debug)]
 pub enum AVBClass {

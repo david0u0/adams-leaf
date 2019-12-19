@@ -12,9 +12,11 @@ pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128, reconf: DiffFlowTable<usize
     let time = Instant::now();
     let aco = &mut algo.aco as *mut ACO;
     algo.g.forget_all_flows();
-    algo.flow_table.foreach_avb(|flow, &route_k| unsafe {
-        algo.update_flowid_on_route(true, flow, route_k);
-    });
+    for (flow, &route_k) in algo.flow_table.iter_avb() {
+        unsafe {
+            algo.update_flowid_on_route(true, flow, route_k);
+        }
+    }
 
     // 算好能見度再把新的 TT 排進去
     let vis = compute_visibility(algo, &reconf);
@@ -46,7 +48,7 @@ fn compute_visibility(algo: &AdamsAnt, reconf: &DiffFlowTable<usize>) -> Vec<[f6
     // 目前：路徑長的倒數
     let len = algo.aco.get_state_len();
     let mut vis = vec![[0.0; MAX_K]; len];
-    algo.flow_table.foreach_avb(|flow, &route_k| {
+    for (flow, &route_k) in algo.flow_table.iter_avb() {
         let id = flow.id;
         for i in 0..algo.get_candidate_count(flow) {
             //vis[id.0][i] = 1.0 / algo.compute_avb_cost(flow, Some(i)).1.powf(2.0);
@@ -56,8 +58,8 @@ fn compute_visibility(algo: &AdamsAnt, reconf: &DiffFlowTable<usize>) -> Vec<[f6
             // 是舊資料流，調高本來路徑的能見度
             vis[id.0][route_k] *= AVB_MEMORY;
         }
-    });
-    algo.flow_table.foreach_tsn(|flow, &route_k| {
+    }
+    for (flow, &route_k) in algo.flow_table.iter_tsn() {
         let id = flow.id;
         for i in 0..algo.get_candidate_count(flow) {
             vis[id.0][i] = 1.0 / algo.get_kth_route(flow, route_k).len() as f64;
@@ -66,7 +68,7 @@ fn compute_visibility(algo: &AdamsAnt, reconf: &DiffFlowTable<usize>) -> Vec<[f6
             // 是舊資料流，調高本來路徑的能見度
             vis[id.0][route_k] *= TSN_MEMORY;
         }
-    });
+    }
     vis
 }
 

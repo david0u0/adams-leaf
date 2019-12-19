@@ -94,19 +94,19 @@ impl<'a> RoutingAlgo for AdamsAnt<'a> {
     }
     fn show_results(&self) {
         println!("TT Flows:");
-        self.flow_table.foreach_tsn(|flow, &route_k| {
+        for (flow, &route_k) in self.flow_table.iter_tsn() {
             let route = self.get_kth_route(flow, route_k);
             println!("flow id = {:?}, route = {:?}", flow.id, route);
-        });
+        }
         println!("AVB Flows:");
-        self.flow_table.foreach_avb(|flow, &route_k| {
+        for (flow, &route_k) in self.flow_table.iter_avb() {
             let route = self.get_kth_route(flow, route_k);
             let cost = self.compute_avb_cost(flow, Some(route_k)).1;
             println!(
                 "flow id = {:?}, route = {:?} cost = {}",
                 flow.id, route, cost
             );
-        });
+        }
         println!("total avb cost = {}", self.compute_all_avb_cost().1);
     }
     fn get_last_compute_time(&self) -> u128 {
@@ -133,23 +133,14 @@ impl<'a> AdamsAnt<'a> {
                 self.yens_algo.compute_routes(flow.src, flow.dst);
             }
         }
-        /*unsafe {
-            for flow in tsns.iter() {
-                self.do_yens_algo(flow.src, flow.dst);
-                reconf.update_info(flow.id, 0);
-            }
-            for flow in avbs.iter() {
-                self.do_yens_algo(flow.src, flow.dst);
-                reconf.update_info(flow.id, 0);
-            }
-        }*/
 
         self.aco
             .extend_state_len(self.flow_table.get_max_id().0 + 1);
 
         do_aco(self, t_limit, reconf);
         self.g.forget_all_flows();
-        self.flow_table
-            .foreach_avb(|flow, r| unsafe { self.update_flowid_on_route(true, flow, *r) });
+        for (flow, &r) in self.flow_table.iter_avb() {
+            unsafe { self.update_flowid_on_route(true, flow, r) }
+        }
     }
 }

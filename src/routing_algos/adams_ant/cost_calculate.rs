@@ -38,10 +38,10 @@ pub fn compute_avb_cost(
 pub fn compute_all_avb_cost(algo: &AdamsAnt, table: &FT, gcl: &GCL) -> AVBCostResult {
     let mut all_cost = 0.0;
     let mut all_fail_cnt = 0;
-    table.foreach_avb(|flow, &k| {
+    for (flow, &k) in table.iter_avb() {
         let (fail_cnt, cost) = compute_avb_cost(algo, flow, Some(k), table, gcl);
         all_fail_cnt += fail_cnt;
         all_cost += cost;
-    });
+    }
     (all_fail_cnt, all_cost)
 }

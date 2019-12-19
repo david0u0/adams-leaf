@@ -34,13 +34,13 @@ impl<'a> RoutingAlgo for SPF<'a> {
     fn add_flows(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>) {
         self.flow_table.insert(tsns.clone(), avbs.clone(), vec![]);
         let mut tt_changed = self.flow_table.clone_as_diff();
-        self.flow_table.foreach_avb(|flow, _| {
+        for (flow, _) in self.flow_table.iter_avb() {
             self.get_shortest_route(flow);
-        });
-        self.flow_table.foreach_tsn(|flow, _| {
+        }
+        for (flow, _) in self.flow_table.iter_tsn() {
             let r = self.get_shortest_route(flow);
             tt_changed.update_info(flow.id, r);
-        });
+        }
 
         // TT schedule
         let _self = self as *mut Self;
@@ -58,12 +58,12 @@ impl<'a> RoutingAlgo for SPF<'a> {
         }
 
         let _g = &mut self.g as *mut StreamAwareGraph;
-        self.flow_table.foreach_avb(|flow, _| {
+        for (flow, r) in self.flow_table.iter_avb() {
             let r = self.get_shortest_route(flow);
             unsafe {
                 (*_g).update_flowid_on_route(true, flow.id, &r);
             }
-        });
+        }
     }
     fn del_flows(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>) {
         unimplemented!();
@@ -76,19 +76,19 @@ impl<'a> RoutingAlgo for SPF<'a> {
     }
     fn show_results(&self) {
         println!("TT Flows:");
-        self.flow_table.foreach_tsn(|flow, _| {
+        for (flow, _) in self.flow_table.iter_tsn() {
             let route = self.get_shortest_route(flow);
             println!("flow id = {:?}, route = {:?}", flow.id, route);
-        });
+        }
         println!("AVB Flows:");
-        self.flow_table.foreach_avb(|flow, _| {
+        for (flow, _) in self.flow_table.iter_avb() {
             let route = self.get_shortest_route(flow);
             let cost = self.compute_avb_cost(flow);
             println!(
                 "flow id = {:?}, route = {:?} cost = {}",
                 flow.id, route, cost
             );
-        });
+        }
         println!("total avb cost = {}", self.compute_all_avb_cost());
     }
 }
@@ -109,9 +109,9 @@ impl<'a> SPF<'a> {
     }
     pub fn compute_all_avb_cost(&self) -> f64 {
         let mut cost = 0.0;
-        self.flow_table.foreach_avb(|flow, _| {
+        for (flow, _) in self.flow_table.iter_avb() {
             cost += self.compute_avb_cost(flow);
-        });
+        }
         cost
     }
 }

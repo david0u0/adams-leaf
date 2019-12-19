@@ -38,7 +38,7 @@ impl<'a, D: Clone, T: Clone> Iterator for Iter<'a, D, T> {
                 v,
                 diff,
                 infos,
-                pos_list
+                pos_list,
             } => {
                 if *ptr < diff.len() {
                     let id = diff[*ptr];
@@ -49,5 +49,18 @@ impl<'a, D: Clone, T: Clone> Iterator for Iter<'a, D, T> {
             }
         }
         None
+    }
+}
+
+pub struct IterMut<'a, D: Clone, T: Clone> {
+    pub(super) iter: Iter<'a, D, T>,
+}
+
+impl<'a, D: Clone, T: Clone> Iterator for IterMut<'a, D, T> {
+    type Item = (&'a Flow<D>, &'a mut T);
+    fn next(&mut self) -> Option<(&'a Flow<D>, &'a mut T)> {
+        self.iter
+            .next()
+            .map(|(flow, t)| unsafe { (flow, &mut *(t as *const T as *mut T)) })
     }
 }

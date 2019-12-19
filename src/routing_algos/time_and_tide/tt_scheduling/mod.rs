@@ -82,9 +82,9 @@ fn schedule_fixed_og<T: Clone, TABLE: IFlowTable<INFO = T>, F: Fn(&TSNFlow, &T) 
     get_links: F,
 ) -> Result<(), ()> {
     let mut tsn_ids = Vec::<FlowID>::new();
-    table.foreach_tsn(|flow, _| {
+    for (flow, _) in table.iter_tsn() {
         tsn_ids.push(flow.id);
-    });
+    }
     tsn_ids.sort_by(|&id1, &id2| cmp_flow(id1, id2, table, |f, t| get_links(f, t)));
     for flow_id in tsn_ids.into_iter() {
         let flow = table.get_tsn(flow_id).unwrap();

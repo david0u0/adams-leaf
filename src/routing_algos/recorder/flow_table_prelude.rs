@@ -2,7 +2,7 @@ use super::super::{
     flow::{AVBData, Flow, FlowID, TSNData},
     AVBFlow, TSNFlow,
 };
-use super::Iter;
+use super::{Iter, IterMut};
 use std::rc::Rc;
 
 #[derive(Clone, Copy)]
@@ -67,17 +67,6 @@ impl FlowArena {
         None
     }
 }
-fn apply_callback<D: Clone, T: Clone, FT: IFlowTable<INFO = T>>(
-    table: &FT,
-    flow: Option<&Flow<D>>,
-    mut callback: impl FnMut(&Flow<D>, &T),
-) {
-    if let Some(flow) = flow {
-        if let Some(info) = table.get_info(flow.id) {
-            callback(flow, info);
-        }
-    }
-}
 
 pub trait IFlowTable {
     type INFO: Clone;
@@ -106,20 +95,6 @@ pub trait IFlowTable {
         let b = &**other.get_inner_arena() as *const FlowArena;
         a == b
     }
-    fn foreach_avb(&self, callback: impl FnMut(&AVBFlow, &Self::INFO));
-    fn foreach_tsn(&self, callback: impl FnMut(&TSNFlow, &Self::INFO));
-    /// __慎用！__ 實現了內部可變性
-    fn foreach_tsn_mut(&self, mut callback: impl FnMut(&TSNFlow, &mut Self::INFO)) {
-        self.foreach_tsn(|flow, t| unsafe {
-            callback(flow, &mut *(t as *const Self::INFO as *mut Self::INFO));
-        });
-    }
-    /// __慎用！__ 實現了內部可變性
-    fn foreach_avb_mut(&self, mut callback: impl FnMut(&AVBFlow, &mut Self::INFO)) {
-        self.foreach_avb(|flow, t| unsafe {
-            callback(flow, &mut *(t as *const Self::INFO as *mut Self::INFO));
-        });
-    }
     /// 建立一個新的資料流表。邏輯上，這個新資料流表為空，但可以執行 update_info。
     /// 遍歷新產生的表時，會自動跳過沒有修改過的資料流，且效能較高。
     /// # 範例
@@ -145,6 +120,16 @@ pub trait IFlowTable {
     }
     fn iter_avb<'a>(&'a self) -> Iter<'a, AVBData, Self::INFO>;
     fn iter_tsn<'a>(&'a self) -> Iter<'a, TSNData, Self::INFO>;
+    fn iter_avb_mut<'a>(&'a mut self) -> IterMut<'a, AVBData, Self::INFO> {
+        IterMut {
+            iter: self.iter_avb(),
+        }
+    }
+    fn iter_tsn_mut<'a>(&'a mut self) -> IterMut<'a, TSNData, Self::INFO> {
+        IterMut {
+            iter: self.iter_tsn(),
+        }
+    }
 }
 
 /// 儲存的資料分為兩部份：資料流本身，以及隨附的資訊（T）。
@@ -172,16 +157,16 @@ impl<T: Clone> FlowTable<T> {
     }
     pub fn apply_diff(&mut self, is_avb: bool, other: &DiffFlowTable<T>) {
         if !self.is_same_flow_list(other) {
-            panic!("試圖合併不相干的 FlowTable");
+            panic!("試圖合併不相干的資料流表");
         }
         if is_avb {
-            other.foreach_avb(|flow, info| {
+            for (flow, info) in other.iter_avb() {
                 self.update_info(flow.id, info.clone());
-            });
+            }
         } else {
-            other.foreach_tsn(|flow, info| {
+            for (flow, info) in other.iter_tsn() {
                 self.update_info(flow.id, info.clone());
-            });
+            }
         }
     }
     pub fn insert<'a>(
@@ -236,21 +221,6 @@ impl<T: Clone> IFlowTable for FlowTable<T> {
         }
     }
 
-    fn foreach_avb(&self, mut callback: impl FnMut(&AVBFlow, &T)) {
-        for i in 0..self.arena.avbs.len() {
-            apply_callback(self, self.arena.avbs[i].as_ref(), |flow, t| {
-                callback(flow, t)
-            });
-        }
-    }
-
-    fn foreach_tsn(&self, mut callback: impl FnMut(&TSNFlow, &T)) {
-        for i in 0..self.arena.tsns.len() {
-            apply_callback(self, self.arena.tsns[i].as_ref(), |flow, t| {
-                callback(flow, t)
-            });
-        }
-    }
     fn clone_as_diff(&self) -> DiffFlowTable<T> {
         DiffFlowTable::new(self)
     }
@@ -314,16 +284,6 @@ impl<T: Clone> IFlowTable for DiffFlowTable<T> {
         }
         self.table.update_info(id, info);
     }
-    fn foreach_avb(&self, mut callback: impl FnMut(&AVBFlow, &T)) {
-        for &id in self.avb_diff.iter() {
-            apply_callback(self, self.get_avb(id), |flow, t| callback(flow, t));
-        }
-    }
-    fn foreach_tsn(&self, mut callback: impl FnMut(&TSNFlow, &T)) {
-        for &id in self.tsn_diff.iter() {
-            apply_callback(self, self.get_tsn(id), |flow, t| callback(flow, t));
-        }
-    }
     fn clone_as_diff(&self) -> DiffFlowTable<T> {
         self.clone()
     }
@@ -334,7 +294,7 @@ impl<T: Clone> IFlowTable for DiffFlowTable<T> {
             v: &self.table.arena.avbs,
             ptr: 0,
             infos: &self.table.infos,
-            pos_list: &self.table.arena.pos_list
+            pos_list: &self.table.arena.pos_list,
         }
     }
     fn iter_tsn<'a>(&'a self) -> Iter<'a, TSNData, T> {
@@ -343,7 +303,7 @@ impl<T: Clone> IFlowTable for DiffFlowTable<T> {
             v: &self.table.arena.tsns,
             ptr: 0,
             infos: &self.table.infos,
-            pos_list: &self.table.arena.pos_list
+            pos_list: &self.table.arena.pos_list,
         }
     }
 }
@@ -445,11 +405,10 @@ mod test {
         }
         assert!(!first);
 
-        table.update_info(1.into(), 1);
-        table.update_info(2.into(), 2);
-        table.update_info(3.into(), 3);
-        table.update_info(4.into(), 4);
-        table.update_info(5.into(), 5);
+        for (flow, data) in table.iter_avb_mut() {
+            assert_eq!(data, &99);
+            *data = flow.id.into()
+        }
 
         for (flow, &data) in table.iter_avb() {
             assert_eq!(flow.id, FlowID(data));
@@ -479,13 +438,15 @@ mod test {
         assert!(!first);
 
         let mut first = true;
-        for (flow, &data) in change.iter_tsn() {
+        for (flow, data) in change.iter_tsn_mut() {
             assert_eq!(FlowID(0), flow.id);
-            assert_eq!(77, data);
+            assert_eq!(77, *data);
             assert!(first); // 只會來一次
+            *data = 9;
             first = false;
         }
         assert!(!first);
+        assert_eq!(&9, change.get_info(0.into()).unwrap());
 
         change.update_info(3.into(), 55);
 

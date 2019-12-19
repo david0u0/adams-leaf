@@ -63,11 +63,11 @@ impl<'a> RO<'a> {
     pub fn compute_all_avb_cost(&self) -> AVBCostResult {
         let mut all_cost = 0.0;
         let mut all_fail_cnt = 0;
-        self.flow_table.foreach_avb(|flow, _| {
+        for (flow, _) in self.flow_table.iter_avb() {
             let (fail_cnt, cost) = self.compute_avb_cost(flow, None);
             all_fail_cnt += fail_cnt;
             all_cost += cost;
-        });
+        }
         (all_fail_cnt, all_cost)
     }
     /// 在所有 TT 都被排定的狀況下去執行 GRASP 優化
@@ -80,16 +80,17 @@ impl<'a> RO<'a> {
             // PHASE 1
             // NOTE 先從圖中把舊的資料流全部忘掉
             self.g.forget_all_flows();
-            self.flow_table.foreach_avb_mut(|flow, route_k| {
-                let candidate_cnt = self.get_candidate_count(flow);
-                let alpha = (candidate_cnt as f64 * ALPHA_PORTION) as usize;
-                let set = Some(gen_n_distinct_outof_k(alpha, candidate_cnt));
-                *route_k = self.find_min_cost_route(flow, set);
-                unsafe {
+            unsafe {
+                let table = &mut *(&mut self.flow_table as *mut FlowTable<usize>);
+                for (flow, route_k) in table.iter_avb_mut() {
+                    let candidate_cnt = self.get_candidate_count(flow);
+                    let alpha = (candidate_cnt as f64 * ALPHA_PORTION) as usize;
+                    let set = Some(gen_n_distinct_outof_k(alpha, candidate_cnt));
+                    *route_k = self.find_min_cost_route(flow, set);
                     // NOTE 把資料流的路徑與ID記憶到圖中
                     self.update_flowid_on_route(true, flow, *route_k);
                 }
-            });
+            }
             // PHASE 2
             let (fail_cnt, cost) = self.compute_all_avb_cost();
             if cost < min_cost {
@@ -243,9 +244,11 @@ impl<'a> RoutingAlgo for RO<'a> {
 
         self.grasp(time);
         self.g.forget_all_flows();
-        self.flow_table.foreach_avb(|flow, r| unsafe {
-            self.update_flowid_on_route(true, flow, *r);
-        });
+        for (flow, &r) in self.flow_table.iter_avb() {
+            unsafe {
+                self.update_flowid_on_route(true, flow, r);
+            }
+        }
 
         self.compute_time = init_time.elapsed().as_micros();
     }
@@ -267,19 +270,19 @@ impl<'a> RoutingAlgo for RO<'a> {
     }
     fn show_results(&self) {
         println!("TT Flows:");
-        self.flow_table.foreach_tsn(|flow, &route_k| {
+        for (flow, &route_k) in self.flow_table.iter_tsn() {
             let route = self.get_kth_route(flow, route_k);
             println!("flow id = {:?}, route = {:?}", flow.id, route);
-        });
+        }
         println!("AVB Flows:");
-        self.flow_table.foreach_avb(|flow, &route_k| {
+        for (flow, &route_k) in self.flow_table.iter_avb() {
             let route = self.get_kth_route(flow, route_k);
             let (_, cost) = self.compute_avb_cost(flow, Some(route_k));
             println!(
                 "flow id = {:?}, route = {:?} cost = {}",
                 flow.id, route, cost
             );
-        });
+        }
         println!("total avb cost = {}", self.compute_all_avb_cost().1);
     }
     fn get_last_compute_time(&self) -> u128 {
