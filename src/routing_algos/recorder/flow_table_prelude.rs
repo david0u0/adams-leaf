@@ -1,7 +1,8 @@
 use super::super::{
-    flow::{Flow, FlowID},
+    flow::{AVBData, Flow, FlowID, TSNData},
     AVBFlow, TSNFlow,
 };
+use super::Iter;
 use std::rc::Rc;
 
 #[derive(Clone, Copy)]
@@ -12,7 +13,8 @@ enum FlowType {
 pub struct FlowArena {
     avbs: Vec<Option<AVBFlow>>,
     tsns: Vec<Option<TSNFlow>>,
-    type_pos_list: Vec<Option<(FlowType, usize)>>,
+    pos_list: Vec<Option<usize>>,
+    type_list: Vec<Option<FlowType>>,
     max_id: FlowID,
 }
 impl FlowArena {
@@ -20,43 +22,46 @@ impl FlowArena {
         FlowArena {
             avbs: vec![],
             tsns: vec![],
-            type_pos_list: vec![],
+            pos_list: vec![],
+            type_list: vec![],
             max_id: 0.into(),
         }
     }
     fn get_flow_type(&self, id: FlowID) -> FlowType {
-        self.type_pos_list[id.0].unwrap().0
+        self.type_list[id.0].unwrap()
     }
     fn insert_avb(&mut self, mut flow: AVBFlow) -> FlowID {
-        let id = FlowID(self.type_pos_list.len());
+        let id = FlowID(self.pos_list.len());
         self.max_id = std::cmp::max(self.max_id, id);
         let pos = self.avbs.len();
         flow.id = id;
         self.avbs.push(Some(flow));
-        self.type_pos_list.push(Some((FlowType::AVB, pos)));
+        self.pos_list.push(Some(pos));
+        self.type_list.push(Some(FlowType::AVB));
         id
     }
     fn insert_tsn(&mut self, mut flow: TSNFlow) -> FlowID {
-        let id = FlowID(self.type_pos_list.len());
+        let id = FlowID(self.pos_list.len());
         self.max_id = std::cmp::max(self.max_id, id);
         let pos = self.tsns.len();
         flow.id = id;
         self.tsns.push(Some(flow));
-        self.type_pos_list.push(Some((FlowType::TSN, pos)));
+        self.pos_list.push(Some(pos));
+        self.type_list.push(Some(FlowType::TSN));
         id
     }
     fn get_avb(&self, id: FlowID) -> Option<&AVBFlow> {
-        if id.0 < self.type_pos_list.len() {
-            if let Some((FlowType::AVB, pos)) = self.type_pos_list[id.0] {
-                return self.avbs[pos].as_ref();
+        if id.0 < self.type_list.len() {
+            if let Some(FlowType::AVB) = self.type_list[id.0] {
+                return self.avbs[self.pos_list[id.0].unwrap()].as_ref();
             }
         }
         None
     }
     fn get_tsn(&self, id: FlowID) -> Option<&TSNFlow> {
-        if id.0 < self.type_pos_list.len() {
-            if let Some((FlowType::TSN, pos)) = self.type_pos_list[id.0] {
-                return self.tsns[pos].as_ref();
+        if id.0 < self.type_list.len() {
+            if let Some(FlowType::TSN) = self.type_list[id.0] {
+                return self.tsns[self.pos_list[id.0].unwrap()].as_ref();
             }
         }
         None
@@ -138,6 +143,8 @@ pub trait IFlowTable {
     fn get_max_id(&self) -> FlowID {
         self.get_inner_arena().max_id
     }
+    fn iter_avb<'a>(&'a self) -> Iter<'a, AVBData, Self::INFO>;
+    fn iter_tsn<'a>(&'a self) -> Iter<'a, TSNData, Self::INFO>;
 }
 
 /// 儲存的資料分為兩部份：資料流本身，以及隨附的資訊（T）。
@@ -225,7 +232,7 @@ impl<T: Clone> IFlowTable for FlowTable<T> {
         if id.0 < self.infos.len() {
             self.infos[id.0] = Some(info);
         } else {
-            panic!("更新資訊時發生越界");
+            panic!("更新資訊時越界");
         }
     }
 
@@ -246,6 +253,20 @@ impl<T: Clone> IFlowTable for FlowTable<T> {
     }
     fn clone_as_diff(&self) -> DiffFlowTable<T> {
         DiffFlowTable::new(self)
+    }
+    fn iter_avb<'a>(&'a self) -> Iter<'a, AVBData, T> {
+        Iter::FlowTable {
+            v: &self.arena.avbs,
+            ptr: 0,
+            infos: &self.infos,
+        }
+    }
+    fn iter_tsn<'a>(&'a self) -> Iter<'a, TSNData, T> {
+        Iter::FlowTable {
+            v: &self.arena.tsns,
+            ptr: 0,
+            infos: &self.infos,
+        }
     }
 }
 
@@ -305,6 +326,25 @@ impl<T: Clone> IFlowTable for DiffFlowTable<T> {
     }
     fn clone_as_diff(&self) -> DiffFlowTable<T> {
         self.clone()
+    }
+
+    fn iter_avb<'a>(&'a self) -> Iter<'a, AVBData, T> {
+        Iter::DiffTable {
+            diff: &self.avb_diff,
+            v: &self.table.arena.avbs,
+            ptr: 0,
+            infos: &self.table.infos,
+            pos_list: &self.table.arena.pos_list
+        }
+    }
+    fn iter_tsn<'a>(&'a self) -> Iter<'a, TSNData, T> {
+        Iter::DiffTable {
+            diff: &self.tsn_diff,
+            v: &self.table.arena.tsns,
+            ptr: 0,
+            infos: &self.table.infos,
+            pos_list: &self.table.arena.pos_list
+        }
     }
 }
 
@@ -390,14 +430,82 @@ mod test {
         table.insert(tsns, avbs, 0);
         table.apply_diff(true, &table2);
     }
+    #[test]
+    fn test_flowtable_iterator() {
+        let mut table = FlowTable::<usize>::new();
+        let (tsns, avbs) = read_flows_from_file("test_flow.json", 1);
+        table.insert(tsns, avbs, 99);
+
+        let mut first = true;
+        for (flow, &data) in table.iter_tsn() {
+            assert_eq!(FlowID(0), flow.id);
+            assert_eq!(99, data);
+            assert!(first); // 只會來一次
+            first = false;
+        }
+        assert!(!first);
+
+        table.update_info(1.into(), 1);
+        table.update_info(2.into(), 2);
+        table.update_info(3.into(), 3);
+        table.update_info(4.into(), 4);
+        table.update_info(5.into(), 5);
+
+        for (flow, &data) in table.iter_avb() {
+            assert_eq!(flow.id, FlowID(data));
+        }
+    }
+    #[test]
+    fn test_difftable_iterator() {
+        let mut table = FlowTable::<usize>::new();
+        let (tsns, avbs) = read_flows_from_file("test_flow.json", 1);
+        table.insert(tsns, avbs, 99);
+        let mut change = table.clone_as_diff();
+        for _ in change.iter_avb() {
+            panic!("不該走進來！");
+        }
+        for _ in change.iter_tsn() {
+            panic!("不該走進來！");
+        }
+        change.update_info(0.into(), 77);
+
+        let mut first = true;
+        for (flow, &data) in table.iter_tsn() {
+            assert_eq!(FlowID(0), flow.id);
+            assert_eq!(99, data);
+            assert!(first); // 只會來一次
+            first = false;
+        }
+        assert!(!first);
+
+        let mut first = true;
+        for (flow, &data) in change.iter_tsn() {
+            assert_eq!(FlowID(0), flow.id);
+            assert_eq!(77, data);
+            assert!(first); // 只會來一次
+            first = false;
+        }
+        assert!(!first);
+
+        change.update_info(3.into(), 55);
+
+        let mut first = true;
+        for (flow, &data) in change.iter_avb() {
+            assert_eq!(FlowID(3), flow.id);
+            assert_eq!(55, data);
+            assert!(first); // 只會來一次
+            first = false;
+        }
+        assert!(!first);
+    }
     fn count_flows_iterative<FT: IFlowTable<INFO = usize>>(table: &FT) -> usize {
         let mut cnt = 0;
-        table.foreach_avb(|_, _| {
+        for _ in table.iter_avb() {
             cnt += 1;
-        });
-        table.foreach_tsn(|_, _| {
+        }
+        for _ in table.iter_tsn() {
             cnt += 1;
-        });
+        }
         cnt
     }
 }

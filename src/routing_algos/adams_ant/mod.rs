@@ -121,22 +121,16 @@ impl<'a> AdamsAnt<'a> {
     pub fn compute_all_avb_cost(&self) -> AVBCostResult {
         compute_all_avb_cost(self, &self.flow_table, &self.gcl)
     }
-    unsafe fn do_yens_algo(&self, src: usize, dst: usize) {
-        let _self = self as *const Self as *mut Self;
-        (*_self).yens_algo.compute_routes(src, dst);
-    }
     pub fn add_flows_in_time(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>, t_limit: u128) {
         let new_ids = self.flow_table.insert(tsns, avbs, 0);
         let mut reconf = self.flow_table.clone_as_diff();
 
-        unsafe {
-            for &id in new_ids.iter() {
-                reconf.update_info(id, 0);
-                if let Some(flow) = self.flow_table.get_avb(id) {
-                    self.yens_algo.compute_routes(flow.src, flow.dst);
-                } else if let Some(flow) = self.flow_table.get_tsn(id) {
-                    self.yens_algo.compute_routes(flow.src, flow.dst);
-                }
+        for &id in new_ids.iter() {
+            reconf.update_info(id, 0);
+            if let Some(flow) = self.flow_table.get_avb(id) {
+                self.yens_algo.compute_routes(flow.src, flow.dst);
+            } else if let Some(flow) = self.flow_table.get_tsn(id) {
+                self.yens_algo.compute_routes(flow.src, flow.dst);
             }
         }
         /*unsafe {
