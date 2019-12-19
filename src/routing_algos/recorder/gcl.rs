@@ -1,3 +1,4 @@
+use super::super::flow::FlowID;
 use std::collections::HashMap;
 
 use crate::MAX_QUEUE;
@@ -31,9 +32,9 @@ mod test {
 pub struct GCL {
     hyper_p: u32,
     // TODO 這個資料結構有優化的空間
-    gate_evt: Vec<Vec<(u32, u32, u8, usize)>>,
-    queue_occupy_evt: Vec<[Vec<(u32, u32, usize)>; MAX_QUEUE as usize]>,
-    queue_map: HashMap<(usize, usize), u8>,
+    gate_evt: Vec<Vec<(u32, u32, u8, FlowID)>>,
+    queue_occupy_evt: Vec<[Vec<(u32, u32, FlowID)>; MAX_QUEUE as usize]>,
+    queue_map: HashMap<(usize, FlowID), u8>,
     gate_evt_lookup: Vec<Option<Vec<(u32, u32)>>>,
 }
 impl GCL {
@@ -92,7 +93,7 @@ impl GCL {
     pub fn insert_gate_evt(
         &mut self,
         link_id: usize,
-        flow_id: usize,
+        flow_id: FlowID,
         queue_id: u8,
         start_time: u32,
         duration: u32,
@@ -120,7 +121,7 @@ impl GCL {
     pub fn insert_queue_evt(
         &mut self,
         link_id: usize,
-        flow_id: usize,
+        flow_id: FlowID,
         queue_id: u8,
         start_time: u32,
         duration: u32,
@@ -131,6 +132,7 @@ impl GCL {
         let entry = (start_time, duration, flow_id);
         let evts = &mut self.queue_occupy_evt[link_id][queue_id as usize];
         match evts.binary_search(&entry) {
+            // FIXME: 這個異常有機率發生，試著重現看看！
             Ok(_) => panic!(
                 "插入重複的佇列事件: link={}, queue={}, {:?}",
                 link_id, queue_id, entry
@@ -182,10 +184,10 @@ impl GCL {
         }
         (self.hyper_p, true)
     }
-    pub fn get_queueid(&self, link_id: usize, flow_id: usize) -> u8 {
+    pub fn get_queueid(&self, link_id: usize, flow_id: FlowID) -> u8 {
         *self.queue_map.get(&(link_id, flow_id)).unwrap()
     }
-    pub fn set_queueid(&mut self, queueid: u8, link_id: usize, flow_id: usize) {
+    pub fn set_queueid(&mut self, queueid: u8, link_id: usize, flow_id: FlowID) {
         self.queue_map.insert((link_id, flow_id), queueid);
     }
     /// 回傳 None 者，代表當前即是空的
@@ -207,7 +209,7 @@ impl GCL {
         }
         None
     }
-    pub fn delete_flow(&mut self, links: &Vec<usize>, flow_id: usize) {
+    pub fn delete_flow(&mut self, links: &Vec<usize>, flow_id: FlowID) {
         for &link_id in links.iter() {
             self.gate_evt_lookup[link_id] = None;
             let gate_evt = &mut self.gate_evt[link_id];
