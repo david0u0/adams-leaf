@@ -51,7 +51,7 @@ fn compute_visibility(algo: &AdamsAnt, reconf: &FlowTable<usize>) -> Vec<[f64; M
             //vis[id.0][i] = 1.0 / algo.compute_avb_cost(flow, Some(i)).1.powf(2.0);
             vis[id.0][i] = 1.0 / algo.get_kth_route(flow, route_k).len() as f64;
         }
-        if !reconf.check_flow_exist(flow.id) {
+        if !reconf.check_exist(flow.id) {
             // 是舊資料流，調高本來路徑的能見度
             vis[id.0][route_k] *= AVB_MEMORY;
         }
@@ -61,7 +61,7 @@ fn compute_visibility(algo: &AdamsAnt, reconf: &FlowTable<usize>) -> Vec<[f64; M
         for i in 0..algo.get_candidate_count(flow) {
             vis[id.0][i] = 1.0 / algo.get_kth_route(flow, route_k).len() as f64;
         }
-        if !reconf.check_flow_exist(id) {
+        if !reconf.check_exist(id) {
             // 是舊資料流，調高本來路徑的能見度
             vis[id.0][route_k] *= TSN_MEMORY;
         }

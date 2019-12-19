@@ -4,6 +4,7 @@ use super::super::{
 };
 use std::rc::Rc;
 
+#[derive(Clone, Copy)]
 enum FlowType {
     AVB,
     TSN,
@@ -20,6 +21,9 @@ impl FlowArena {
             tsns: vec![],
             type_pos_list: vec![],
         }
+    }
+    fn get_flow_type(&self, id: FlowID) -> FlowType {
+        self.type_pos_list[id.0].unwrap().0
     }
     fn insert_avb(&mut self, mut flow: AVBFlow) -> FlowID {
         let id = FlowID(self.type_pos_list.len());
@@ -54,25 +58,69 @@ impl FlowArena {
         None
     }
 }
+fn apply_callback<D: Clone, T: Clone, FT: IFlowTable<INFO = T>>(
+    table: &FT,
+    flow: Option<&Flow<D>>,
+    mut callback: impl FnMut(&Flow<D>, &T),
+) {
+    if let Some(flow) = flow {
+        if let Some(info) = table.get_info(flow.id) {
+            callback(flow, info);
+        }
+    }
+}
 
 pub trait IFlowTable {
     type INFO: Clone;
     fn get_inner_arena(&self) -> &Rc<FlowArena>;
-    fn check_flow_exist(&self, id: FlowID) -> bool;
-    fn get_avb(&self, id: FlowID) -> Option<&AVBFlow>;
-    fn get_tsn(&self, id: FlowID) -> Option<&TSNFlow>;
     fn get_info(&self, id: FlowID) -> Option<&Self::INFO>;
-    fn delete_flow(&mut self, id: FlowID);
-    fn insert(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>, default_info: Self::INFO);
     fn update_info(&mut self, id: FlowID, info: Self::INFO);
-    fn is_same_flow_list(&self, other: &FlowTable<Self::INFO>) -> bool;
-    fn get_count(&self, is_avb: bool) -> usize;
+    fn check_exist(&self, id: FlowID) -> bool {
+        self.get_info(id).is_some()
+    }
+    fn get_avb(&self, id: FlowID) -> Option<&AVBFlow> {
+        if self.check_exist(id) {
+            self.get_inner_arena().get_avb(id)
+        } else {
+            None
+        }
+    }
+    fn get_tsn(&self, id: FlowID) -> Option<&TSNFlow> {
+        if self.check_exist(id) {
+            self.get_inner_arena().get_tsn(id)
+        } else {
+            None
+        }
+    }
+    fn is_same_flow_list<T: IFlowTable<INFO = Self::INFO>>(&self, other: &T) -> bool {
+        let a = &**self.get_inner_arena() as *const FlowArena;
+        let b = &**other.get_inner_arena() as *const FlowArena;
+        a == b
+    }
+    fn get_count(&self, is_avb: bool) -> usize {
+        let mut cnt = 0;
+        if is_avb {
+            self.foreach_avb(|_, _| cnt += 1);
+        } else {
+            self.foreach_tsn(|_, _| cnt += 1);
+        }
+        cnt
+    }
     fn foreach_avb(&self, callback: impl FnMut(&AVBFlow, &Self::INFO));
     fn foreach_tsn(&self, callback: impl FnMut(&TSNFlow, &Self::INFO));
     /// __慎用！__ 實現了內部可變性
-    fn foreach_mut_tsn(&self, callback: impl FnMut(&TSNFlow, &mut Self::INFO));
+    fn foreach_tsn_mut(&self, mut callback: impl FnMut(&TSNFlow, &mut Self::INFO)) {
+        self.foreach_tsn(|flow, t| unsafe {
+            callback(flow, &mut *(t as *const Self::INFO as *mut Self::INFO));
+        });
+    }
     /// __慎用！__ 實現了內部可變性
-    fn foreach_avb_mut(&self, callback: impl FnMut(&AVBFlow, &mut Self::INFO));
+    fn foreach_avb_mut(&self, mut callback: impl FnMut(&AVBFlow, &mut Self::INFO)) {
+        self.foreach_avb(|flow, t| unsafe {
+            callback(flow, &mut *(t as *const Self::INFO as *mut Self::INFO));
+        });
+    }
+    fn clone_as_diff(&self) -> DiffFlowTable<Self::INFO>;
 }
 
 /// 儲存的資料分為兩部份：資料流本身，以及隨附的資訊（T）。
@@ -117,19 +165,7 @@ impl<T: Clone> FlowTable<T> {
             arena: self.arena.clone(),
         }
     }
-    fn apply_callback<D: Clone + std::fmt::Debug>(
-        &self,
-        flow: Option<&Flow<D>>,
-        mut callback: impl FnMut(&Flow<D>, &T),
-    ) {
-        if let Some(flow) = flow {
-            if let Some(info) = self.get_info(flow.id) {
-                callback(flow, info);
-            }
-        }
-    }
-
-    pub fn union(&mut self, is_avb: bool, other: &FlowTable<T>) {
+    pub fn union<FT: IFlowTable<INFO = T>>(&mut self, is_avb: bool, other: &FT) {
         if !self.is_same_flow_list(other) {
             panic!("試圖合併不相干的 FlowTable");
         }
@@ -143,40 +179,7 @@ impl<T: Clone> FlowTable<T> {
             });
         }
     }
-}
-impl<T: Clone> IFlowTable for FlowTable<T> {
-    type INFO = T;
-    fn get_inner_arena(&self) -> &Rc<FlowArena> {
-        &self.arena
-    }
-    fn check_flow_exist(&self, id: FlowID) -> bool {
-        self.infos[id.0].is_some()
-    }
-    fn get_avb(&self, id: FlowID) -> Option<&AVBFlow> {
-        if self.get_info(id).is_some() {
-            self.arena.get_avb(id)
-        } else {
-            None
-        }
-    }
-    fn get_tsn(&self, id: FlowID) -> Option<&TSNFlow> {
-        if self.get_info(id).is_some() {
-            self.arena.get_tsn(id)
-        } else {
-            None
-        }
-    }
-    fn get_info(&self, id: FlowID) -> Option<&T> {
-        if id.0 < self.infos.len() {
-            self.infos[id.0].as_ref()
-        } else {
-            None
-        }
-    }
-    fn delete_flow(&mut self, id: FlowID) {
-        unimplemented!();
-    }
-    fn insert(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>, default_info: T) {
+    pub fn insert(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>, default_info: T) {
         if let Some(arena) = Rc::get_mut(&mut self.arena) {
             for flow in tsns.into_iter() {
                 arena.insert_tsn(flow);
@@ -190,59 +193,111 @@ impl<T: Clone> IFlowTable for FlowTable<T> {
             panic!("插入資料流時發生數據爭用");
         }
     }
+}
+impl<T: Clone> IFlowTable for FlowTable<T> {
+    type INFO = T;
+    fn get_inner_arena(&self) -> &Rc<FlowArena> {
+        &self.arena
+    }
+    fn get_info(&self, id: FlowID) -> Option<&T> {
+        if id.0 < self.infos.len() {
+            self.infos[id.0].as_ref()
+        } else {
+            None
+        }
+    }
     fn update_info(&mut self, id: FlowID, info: T) {
-        self.infos[id.0] = Some(info);
-        if let Some(changed) = &mut self.changed {
-            changed.push(id);
+        if id.0 < self.infos.len() {
+            self.infos[id.0] = Some(info);
+            if let Some(changed) = &mut self.changed {
+                changed.push(id);
+            }
+        } else {
+            panic!("更新資訊時發生越界");
         }
     }
 
     fn foreach_avb(&self, mut callback: impl FnMut(&AVBFlow, &T)) {
         if let Some(changed) = &self.changed {
             for &i in changed.iter() {
-                self.apply_callback(self.get_avb(i), |flow, t| callback(flow, t));
+                apply_callback(self, self.get_avb(i), |flow, t| callback(flow, t));
             }
         } else {
             for i in 0..self.arena.avbs.len() {
-                self.apply_callback(self.arena.avbs[i].as_ref(), |flow, t| callback(flow, t));
+                apply_callback(self, self.arena.avbs[i].as_ref(), |flow, t| {
+                    callback(flow, t)
+                });
             }
         }
-    }
-    fn foreach_avb_mut(&self, mut callback: impl FnMut(&AVBFlow, &mut T)) {
-        self.foreach_avb(|flow, t| unsafe {
-            callback(flow, &mut *(t as *const T as *mut T));
-        });
     }
 
     fn foreach_tsn(&self, mut callback: impl FnMut(&TSNFlow, &T)) {
         if let Some(changed) = &self.changed {
             for &i in changed.iter() {
-                self.apply_callback(self.get_tsn(i), |flow, t| callback(flow, t));
+                apply_callback(self, self.get_tsn(i), |flow, t| callback(flow, t));
             }
         } else {
             for i in 0..self.arena.tsns.len() {
-                self.apply_callback(self.arena.tsns[i].as_ref(), |flow, t| callback(flow, t));
+                apply_callback(self, self.arena.tsns[i].as_ref(), |flow, t| {
+                    callback(flow, t)
+                });
             }
         }
     }
-    fn foreach_mut_tsn(&self, mut callback: impl FnMut(&TSNFlow, &mut T)) {
-        self.foreach_tsn(|flow, t| unsafe {
-            callback(flow, &mut *(t as *const T as *mut T));
-        });
+    fn clone_as_diff(&self) -> DiffFlowTable<T> {
+        DiffFlowTable::new(self)
     }
-    fn is_same_flow_list(&self, other: &FlowTable<T>) -> bool {
-        let a = &*self.arena as *const FlowArena;
-        let b = &*other.arena as *const FlowArena;
-        a == b
-    }
-    fn get_count(&self, is_avb: bool) -> usize {
-        let mut cnt = 0;
-        if is_avb {
-            self.foreach_avb(|_, _| cnt += 1);
-        } else {
-            self.foreach_tsn(|_, _| cnt += 1);
+}
+
+#[derive(Clone)]
+pub struct DiffFlowTable<T: Clone> {
+    avb_diff: Vec<FlowID>,
+    tsn_diff: Vec<FlowID>,
+    table: FlowTable<T>,
+}
+impl<T: Clone> DiffFlowTable<T> {
+    pub fn new(og_table: &FlowTable<T>) -> Self {
+        DiffFlowTable {
+            avb_diff: vec![],
+            tsn_diff: vec![],
+            table: FlowTable {
+                arena: og_table.arena.clone(),
+                changed: None,
+                infos: vec![None; og_table.arena.type_pos_list.len()],
+            },
         }
-        cnt
+    }
+}
+impl<T: Clone> IFlowTable for DiffFlowTable<T> {
+    type INFO = T;
+    fn get_inner_arena(&self) -> &Rc<FlowArena> {
+        &self.table.get_inner_arena()
+    }
+    fn get_info(&self, id: FlowID) -> Option<&Self::INFO> {
+        self.table.get_info(id)
+    }
+    fn update_info(&mut self, id: FlowID, info: Self::INFO) {
+        // NOTE: 若 check_exist 有東西，就不記錄到 diff 裡（因為記錄過了）
+        if !self.check_exist(id) {
+            match self.get_inner_arena().get_flow_type(id) {
+                FlowType::TSN => self.tsn_diff.push(id),
+                FlowType::AVB => self.avb_diff.push(id),
+            }
+        }
+        self.table.update_info(id, info);
+    }
+    fn foreach_avb(&self, mut callback: impl FnMut(&AVBFlow, &T)) {
+        for &id in self.avb_diff.iter() {
+            apply_callback(self, self.get_avb(id), |flow, t| callback(flow, t));
+        }
+    }
+    fn foreach_tsn(&self, mut callback: impl FnMut(&TSNFlow, &T)) {
+        for &id in self.tsn_diff.iter() {
+            apply_callback(self, self.get_tsn(id), |flow, t| callback(flow, t));
+        }
+    }
+    fn clone_as_diff(&self) -> DiffFlowTable<T> {
+        self.clone()
     }
 }
 

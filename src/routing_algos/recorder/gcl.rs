@@ -132,6 +132,7 @@ impl GCL {
         let entry = (start_time, duration, flow_id);
         let evts = &mut self.queue_occupy_evt[link_id][queue_id as usize];
         match evts.binary_search(&entry) {
+            // FIXME: 這個異常有機率發生，試著重現看看！
             Ok(_) => panic!(
                 "插入重複的佇列事件: link={}, queue={}, {:?}",
                 link_id, queue_id, entry

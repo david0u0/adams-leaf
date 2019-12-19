@@ -64,7 +64,7 @@ pub fn schedule_online<T: Clone, F: Fn(&TSNFlow, &T) -> Links>(
     get_links: F,
 ) -> Result<bool, ()> {
     let result = schedule_fixed_og(changed_table, gcl, |f, t| get_links(f, t));
-    og_table.union(false, &changed_table);
+    og_table.union(false, changed_table);
     if !result.is_ok() {
         gcl.clear();
         schedule_fixed_og(og_table, gcl, |f, t| get_links(f, t))?;
