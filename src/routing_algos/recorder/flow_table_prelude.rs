@@ -150,7 +150,6 @@ pub trait IFlowTable {
 #[derive(Clone)]
 pub struct FlowTable<T: Clone> {
     arena: Rc<FlowArena>,
-    changed: Option<Vec<FlowID>>,
     infos: Vec<Option<T>>,
     avb_cnt: usize,
     tsn_cnt: usize,
@@ -158,7 +157,6 @@ pub struct FlowTable<T: Clone> {
 impl<T: Clone> FlowTable<T> {
     pub fn new() -> Self {
         FlowTable {
-            changed: None,
             infos: vec![],
             arena: Rc::new(FlowArena::new()),
             avb_cnt: 0,
@@ -226,39 +224,24 @@ impl<T: Clone> IFlowTable for FlowTable<T> {
     fn update_info(&mut self, id: FlowID, info: T) {
         if id.0 < self.infos.len() {
             self.infos[id.0] = Some(info);
-            if let Some(changed) = &mut self.changed {
-                changed.push(id);
-            }
         } else {
             panic!("更新資訊時發生越界");
         }
     }
 
     fn foreach_avb(&self, mut callback: impl FnMut(&AVBFlow, &T)) {
-        if let Some(changed) = &self.changed {
-            for &i in changed.iter() {
-                apply_callback(self, self.get_avb(i), |flow, t| callback(flow, t));
-            }
-        } else {
-            for i in 0..self.arena.avbs.len() {
-                apply_callback(self, self.arena.avbs[i].as_ref(), |flow, t| {
-                    callback(flow, t)
-                });
-            }
+        for i in 0..self.arena.avbs.len() {
+            apply_callback(self, self.arena.avbs[i].as_ref(), |flow, t| {
+                callback(flow, t)
+            });
         }
     }
 
     fn foreach_tsn(&self, mut callback: impl FnMut(&TSNFlow, &T)) {
-        if let Some(changed) = &self.changed {
-            for &i in changed.iter() {
-                apply_callback(self, self.get_tsn(i), |flow, t| callback(flow, t));
-            }
-        } else {
-            for i in 0..self.arena.tsns.len() {
-                apply_callback(self, self.arena.tsns[i].as_ref(), |flow, t| {
-                    callback(flow, t)
-                });
-            }
+        for i in 0..self.arena.tsns.len() {
+            apply_callback(self, self.arena.tsns[i].as_ref(), |flow, t| {
+                callback(flow, t)
+            });
         }
     }
     fn clone_as_diff(&self) -> DiffFlowTable<T> {
@@ -279,7 +262,6 @@ impl<T: Clone> DiffFlowTable<T> {
             tsn_diff: vec![],
             table: FlowTable {
                 arena: og_table.arena.clone(),
-                changed: None,
                 infos: vec![None; og_table.infos.len()],
                 avb_cnt: 0,
                 tsn_cnt: 0,
