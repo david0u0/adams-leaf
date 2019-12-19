@@ -321,13 +321,13 @@ mod test {
         table.insert(vec![], vec![], 0);
     }
     #[test]
-    fn test_changed_flow_table() {
+    fn test_diff_flow_table() {
         let mut table = FlowTable::<usize>::new();
         let (tsns, avbs) = read_flows_from_file("test_flow.json", 1);
         table.insert(tsns, avbs, 0);
         assert_eq!(count_flows_inside(&table), 6);
 
-        let mut changed = table.clone_into_changed_table();
+        let mut changed = table.clone_as_diff();
         assert_eq!(count_flows_inside(&changed), 0);
 
         changed.update_info(2.into(), 99);
@@ -336,11 +336,15 @@ mod test {
         changed.update_info(4.into(), 77);
         assert_eq!(count_flows_inside(&changed), 2);
 
+        assert_eq!(changed.get_info(0.into()), None);
         assert_eq!(changed.get_info(2.into()), Some(&99));
         assert_eq!(changed.get_info(4.into()), Some(&77));
+        assert_eq!(table.get_info(0.into()), Some(&0));
         assert_eq!(table.get_info(2.into()), Some(&0));
+        assert_eq!(table.get_info(4.into()), Some(&0));
 
         table.union(true, &changed);
+        assert_eq!(table.get_info(0.into()), Some(&0));
         assert_eq!(table.get_info(2.into()), Some(&99));
         assert_eq!(table.get_info(4.into()), Some(&77));
         assert_eq!(count_flows_inside(&table), 6);
@@ -355,7 +359,7 @@ mod test {
         table.insert(tsns, avbs, 0);
         table.union(true, &table2);
     }
-    fn count_flows_inside(table: &FlowTable<usize>) -> usize {
+    fn count_flows_inside<FT: IFlowTable<INFO=usize>>(table: &FT) -> usize {
         table.get_count(true) + table.get_count(false)
     }
 }
