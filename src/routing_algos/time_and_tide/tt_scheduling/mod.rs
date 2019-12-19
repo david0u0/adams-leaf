@@ -2,6 +2,7 @@ use super::super::{flow::FlowID, flow_table_prelude::*, TSNFlow, GCL};
 use crate::MAX_QUEUE;
 
 type FT<T> = FlowTable<T>;
+type DT<T> = DiffFlowTable<T>;
 type Links = Vec<(usize, f64)>;
 
 const MTU: usize = 1500;
@@ -21,10 +22,10 @@ use std::cmp::Ordering;
 /// * `deadline` - 時間較緊的要排前面
 /// * `period` - 週期短的要排前面
 /// * `route length` - 路徑長的要排前面
-fn cmp_flow<T: Clone, F: Fn(&TSNFlow, &T) -> Links>(
+fn cmp_flow<T: Clone, TABLE: IFlowTable<INFO = T>, F: Fn(&TSNFlow, &T) -> Links>(
     id1: FlowID,
     id2: FlowID,
-    table: &FT<T>,
+    table: &TABLE,
     get_links: F,
 ) -> Ordering {
     let flow1 = table.get_tsn(id1).unwrap();
@@ -59,12 +60,12 @@ fn cmp_flow<T: Clone, F: Fn(&TSNFlow, &T) -> Links>(
 /// * 回傳 - Ok(false) 代表沒事發生，Ok(true) 代表發生大洗牌
 pub fn schedule_online<T: Clone, F: Fn(&TSNFlow, &T) -> Links>(
     og_table: &mut FT<T>,
-    changed_table: &FT<T>,
+    changed_table: &DT<T>,
     gcl: &mut GCL,
     get_links: F,
 ) -> Result<bool, ()> {
     let result = schedule_fixed_og(changed_table, gcl, |f, t| get_links(f, t));
-    og_table.union(false, changed_table);
+    og_table.apply_diff(false, changed_table);
     if !result.is_ok() {
         gcl.clear();
         schedule_fixed_og(og_table, gcl, |f, t| get_links(f, t))?;
@@ -75,19 +76,19 @@ pub fn schedule_online<T: Clone, F: Fn(&TSNFlow, &T) -> Links>(
 }
 
 /// 也可以當作離線排程算法來使用
-fn schedule_fixed_og<T: Clone, F: Fn(&TSNFlow, &T) -> Links>(
-    changed_table: &FT<T>,
+fn schedule_fixed_og<T: Clone, TABLE: IFlowTable<INFO = T>, F: Fn(&TSNFlow, &T) -> Links>(
+    table: &TABLE,
     gcl: &mut GCL,
     get_links: F,
 ) -> Result<(), ()> {
     let mut tsn_ids = Vec::<FlowID>::new();
-    changed_table.foreach_tsn(|flow, _| {
+    table.foreach_tsn(|flow, _| {
         tsn_ids.push(flow.id);
     });
-    tsn_ids.sort_by(|&id1, &id2| cmp_flow(id1, id2, changed_table, |f, t| get_links(f, t)));
+    tsn_ids.sort_by(|&id1, &id2| cmp_flow(id1, id2, table, |f, t| get_links(f, t)));
     for flow_id in tsn_ids.into_iter() {
-        let flow = changed_table.get_tsn(flow_id).unwrap();
-        let links = get_links(flow, changed_table.get_info(flow_id).unwrap());
+        let flow = table.get_tsn(flow_id).unwrap();
+        let links = get_links(flow, table.get_info(flow_id).unwrap());
         let mut all_offsets: Vec<Vec<u32>> = vec![];
         // NOTE 一個資料流的每個封包，在單一埠口上必需採用同一個佇列
         let mut ro: Vec<u8> = vec![0; links.len()];

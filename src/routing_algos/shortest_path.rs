@@ -33,7 +33,7 @@ impl<'a> RoutingAlgo for SPF<'a> {
     }
     fn add_flows(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>) {
         self.flow_table.insert(tsns.clone(), avbs.clone(), vec![]);
-        let mut tt_changed = self.flow_table.clone_into_changed_table();
+        let mut tt_changed = self.flow_table.clone_as_diff();
         self.flow_table.foreach_avb(|flow, _| {
             self.get_shortest_route(flow);
         });

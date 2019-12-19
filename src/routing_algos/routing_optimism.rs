@@ -28,8 +28,6 @@ pub struct RO<'a> {
     flow_table: FT,
     yens_algo: YensAlgo<'a, usize, StreamAwareGraph>,
     gcl: GCL,
-    avb_count: usize,
-    tt_count: usize,
     compute_time: u128,
 }
 
@@ -40,8 +38,6 @@ impl<'a> RO<'a> {
         RO {
             g: g.clone(),
             yens_algo: YensAlgo::new(g, MAX_K),
-            avb_count: flow_table.get_count(true),
-            tt_count: flow_table.get_count(false),
             gcl,
             flow_table,
             compute_time: 0,
@@ -144,7 +140,7 @@ impl<'a> RO<'a> {
         let mut best_fail_cnt = std::u32::MAX;
         while time.elapsed().as_micros() < T_LIMIT {
             let target_id: FlowID = rand::thread_rng()
-                .gen_range(0, self.avb_count + self.tt_count)
+                .gen_range(0, self.flow_table.get_flow_cnt())
                 .into();
             let target_flow = {
                 // TODO 用更好的機制篩選 avb flow
@@ -194,7 +190,7 @@ impl<'a> RO<'a> {
                 self.flow_table.update_info(target_id, old_route);
 
                 iter_times += 1;
-                if iter_times == self.avb_count {
+                if iter_times == self.flow_table.get_flow_cnt() {
                     break;
                 }
             }
@@ -216,25 +212,26 @@ impl<'a> RO<'a> {
 impl<'a> RoutingAlgo for RO<'a> {
     fn add_flows(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>) {
         let init_time = Instant::now();
-        self.flow_table.insert(tsns, avbs, 0);
-        let mut tt_changed = self.flow_table.clone_into_changed_table();
-        let _self = unsafe { &mut *(self as *mut Self) };
-        self.flow_table.foreach_avb(|flow, _| {
-            _self.yens_algo.compute_routes(flow.src, flow.dst);
-            _self.avb_count += 1;
-        });
-        self.flow_table.foreach_tsn(|flow, _| {
-            _self.yens_algo.compute_routes(flow.src, flow.dst);
-            _self.tt_count += 1;
-            tt_changed.update_info(flow.id, 0);
-        });
+        let new_ids = self.flow_table.insert(tsns, avbs, 0);
+        let mut reconf = self.flow_table.clone_as_diff();
+        unsafe {
+            let _self = &mut *(self as *mut Self);
+            for &id in new_ids.iter() {
+                reconf.update_info(id, 0); // 這裡好像不用管 avb，不過…管他的
+                if let Some(flow) = self.flow_table.get_avb(id) {
+                    _self.yens_algo.compute_routes(flow.src, flow.dst);
+                } else if let Some(flow) = self.flow_table.get_tsn(id) {
+                    _self.yens_algo.compute_routes(flow.src, flow.dst);
+                }
+            }
+        }
         let time = Instant::now();
         // TT schedule
         unsafe {
             let _self = self as *mut Self;
             schedule_online(
                 &mut (*_self).flow_table,
-                &tt_changed,
+                &reconf,
                 &mut (*_self).gcl,
                 |flow, &k| {
                     let r = self.get_kth_route(flow, k);

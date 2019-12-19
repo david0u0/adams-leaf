@@ -8,7 +8,7 @@ use crate::{FAST_STOP, MAX_K, W1, W2};
 const TSN_MEMORY: f64 = 3.0; // 計算能見度時，TSN 對舊路徑的偏好程度
 const AVB_MEMORY: f64 = 3.0; // 計算能見度時，AVB 對舊路徑的偏好程度
 
-pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128, reconf: FlowTable<usize>) {
+pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128, reconf: DiffFlowTable<usize>) {
     let time = Instant::now();
     let aco = &mut algo.aco as *mut ACO;
     algo.g.forget_all_flows();
@@ -40,7 +40,8 @@ pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128, reconf: FlowTable<usize>) {
     };
 }
 
-fn compute_visibility(algo: &AdamsAnt, reconf: &FlowTable<usize>) -> Vec<[f64; MAX_K]> {
+/// 傳入差異表只是為了要看看誰是舊的（然後賦與不同的能見度）
+fn compute_visibility(algo: &AdamsAnt, reconf: &DiffFlowTable<usize>) -> Vec<[f64; MAX_K]> {
     // TODO 好好設計能見度函式！
     // 目前：路徑長的倒數
     let len = algo.aco.get_state_len();
@@ -76,7 +77,7 @@ unsafe fn compute_aco_dist(
     best_dist: &mut f64,
 ) -> AVBCostResult {
     let mut table = algo.flow_table.clone();
-    let mut tt_changed_table = table.clone_into_changed_table();
+    let mut tt_changed_table = table.clone_as_diff();
     let mut gcl = algo.gcl.clone();
     // 第一輪：處理 TT 重排的問題
     for (id, &route_k) in state.iter().enumerate() {
@@ -121,12 +122,9 @@ unsafe fn compute_aco_dist(
         }
     }
     let avb_cost_res = compute_all_avb_cost(algo, &table, &gcl);
-    let cost2 = avb_cost_res.1 / algo.avb_count as f64;
+    let cost2 = avb_cost_res.1 / algo.flow_table.get_avb_cnt() as f64;
 
     let cost = W1 * cost1 + W2 * cost2;
-
-    #[cfg(debug_assertions)]
-    println!("{:?} {}", state, cost2 * algo.avb_count as f64);
 
     let base: f64 = 10.0;
     let dist = base.powf(cost - 1.0);

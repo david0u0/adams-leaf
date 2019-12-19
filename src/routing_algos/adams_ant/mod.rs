@@ -18,6 +18,7 @@ mod aco_routing;
 use aco_routing::do_aco;
 
 type FT = FlowTable<usize>;
+type DT = DiffFlowTable<usize>;
 const K: usize = 20;
 
 pub struct AdamsAnt<'a> {
@@ -26,8 +27,6 @@ pub struct AdamsAnt<'a> {
     flow_table: FT,
     yens_algo: YensAlgo<'a, usize, StreamAwareGraph>,
     gcl: GCL,
-    avb_count: usize,
-    tt_count: usize,
     compute_time: u128,
 }
 impl<'a> AdamsAnt<'a> {
@@ -40,8 +39,6 @@ impl<'a> AdamsAnt<'a> {
             aco: ACO::new(0, K, None),
             g: g.clone(),
             yens_algo: YensAlgo::new(g, K),
-            avb_count: 0,
-            tt_count: 0,
             compute_time: 0,
         }
     }
@@ -55,9 +52,10 @@ impl<'a> AdamsAnt<'a> {
         &self,
         gcl: &mut GCL,
         og_table: &mut FT,
-        changed_table: &FT,
+        changed_table: &DT,
     ) -> Result<bool, ()> {
         let _self = self as *const Self;
+        // TODO: 為什麼要這個 unsafe ?
         unsafe {
             schedule_online(og_table, changed_table, gcl, |flow, &k| {
                 let r = (*_self).get_kth_route(flow, k);
@@ -128,26 +126,34 @@ impl<'a> AdamsAnt<'a> {
         (*_self).yens_algo.compute_routes(src, dst);
     }
     pub fn add_flows_in_time(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>, t_limit: u128) {
-        let mut max_id = 0;
-        self.flow_table.insert(tsns, avbs, 0);
-        let mut tsn_reconf = self.flow_table.clone_into_changed_table();
-        let _self = unsafe { &mut *(self as *mut Self) };
-        self.flow_table.foreach_avb(|flow, _| unsafe {
-            max_id = std::cmp::max(max_id, flow.id.0);
-            _self.do_yens_algo(flow.src, flow.dst);
-            tsn_reconf.update_info(flow.id, 0);
-            _self.avb_count += 1;
-        });
-        // TODO: 這裡可以寫個宏來生成一模一樣的代碼
-        self.flow_table.foreach_tsn(|flow, _| unsafe {
-            max_id = std::cmp::max(max_id, flow.id.0);
-            _self.do_yens_algo(flow.src, flow.dst);
-            tsn_reconf.update_info(flow.id, 0);
-            _self.tt_count += 1;
-        });
-        self.aco.extend_state_len(max_id + 1);
+        let new_ids = self.flow_table.insert(tsns, avbs, 0);
+        let mut reconf = self.flow_table.clone_as_diff();
 
-        do_aco(self, t_limit, tsn_reconf);
+        unsafe {
+            for &id in new_ids.iter() {
+                reconf.update_info(id, 0);
+                if let Some(flow) = self.flow_table.get_avb(id) {
+                    self.yens_algo.compute_routes(flow.src, flow.dst);
+                } else if let Some(flow) = self.flow_table.get_tsn(id) {
+                    self.yens_algo.compute_routes(flow.src, flow.dst);
+                }
+            }
+        }
+        /*unsafe {
+            for flow in tsns.iter() {
+                self.do_yens_algo(flow.src, flow.dst);
+                reconf.update_info(flow.id, 0);
+            }
+            for flow in avbs.iter() {
+                self.do_yens_algo(flow.src, flow.dst);
+                reconf.update_info(flow.id, 0);
+            }
+        }*/
+
+        self.aco
+            .extend_state_len(self.flow_table.get_max_id().0 + 1);
+
+        do_aco(self, t_limit, reconf);
         self.g.forget_all_flows();
         self.flow_table
             .foreach_avb(|flow, r| unsafe { self.update_flowid_on_route(true, flow, *r) });
