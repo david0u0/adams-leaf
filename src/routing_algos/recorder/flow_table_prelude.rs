@@ -155,15 +155,18 @@ impl<T: Clone> FlowTable<T> {
             tsn_cnt: 0,
         }
     }
-    pub fn map_into<U: Clone, F: Fn(FlowID, &T) -> U>(&self, func: F) -> FlowTable<U> {
-        let infos = self.infos.iter().enumerate().map(|(i, t)| {
-            t.as_ref().map(|t| func(FlowID(i), t))
-        }).collect();
+    pub fn map_as<U: Clone, F: Fn(FlowID, &T) -> U>(&self, func: F) -> FlowTable<U> {
+        let infos = self
+            .infos
+            .iter()
+            .enumerate()
+            .map(|(i, t)| t.as_ref().map(|t| func(FlowID(i), t)))
+            .collect();
         FlowTable {
             arena: Rc::new(FlowArena::new()),
             avb_cnt: self.avb_cnt,
             tsn_cnt: self.tsn_cnt,
-            infos
+            infos,
         }
     }
     pub fn apply_diff(&mut self, is_avb: bool, other: &DiffFlowTable<T>) {
@@ -471,13 +474,13 @@ mod test {
         assert!(!first);
     }
     #[test]
-    fn test_map_into() {
+    fn test_map_as() {
         let mut table = FlowTable::<usize>::new();
         let (tsns, avbs) = read_flows_from_file("test_flow.json", 1);
         table.insert(tsns, avbs, 99);
         table.update_info(2.into(), 77);
 
-        let new_table = table.map_into(|id, t| {
+        let new_table = table.map_as(|id, t| {
             if table.get_tsn(id).is_some() {
                 format!("tsn, id={}, og_value={}", id.0, t)
             } else {
@@ -485,10 +488,22 @@ mod test {
             }
         });
 
-        assert_eq!(Some(&"tsn, id=0, og_value=99".to_owned()), new_table.get_info(0.into()));
-        assert_eq!(Some(&"avb, id=1, og_value=99".to_owned()), new_table.get_info(1.into()));
-        assert_eq!(Some(&"avb, id=2, og_value=77".to_owned()), new_table.get_info(2.into()));
-        assert_eq!(Some(&"avb, id=3, og_value=99".to_owned()), new_table.get_info(3.into()));
+        assert_eq!(
+            Some(&"tsn, id=0, og_value=99".to_owned()),
+            new_table.get_info(0.into())
+        );
+        assert_eq!(
+            Some(&"avb, id=1, og_value=99".to_owned()),
+            new_table.get_info(1.into())
+        );
+        assert_eq!(
+            Some(&"avb, id=2, og_value=77".to_owned()),
+            new_table.get_info(2.into())
+        );
+        assert_eq!(
+            Some(&"avb, id=3, og_value=99".to_owned()),
+            new_table.get_info(3.into())
+        );
         assert_eq!(None, new_table.get_info(8.into()));
     }
     fn count_flows_iterative<FT: IFlowTable<INFO = usize>>(table: &FT) -> usize {

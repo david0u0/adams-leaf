@@ -101,13 +101,14 @@ impl<'a> RoutingAlgo for AdamsAnt<'a> {
         println!("AVB Flows:");
         for (flow, &route_k) in self.flow_table.iter_avb() {
             let route = self.get_kth_route(flow, route_k);
-            let cost = self.compute_avb_cost(flow, Some(route_k)).1;
+            let cost = compute_avb_cost(self, flow, None, &self.flow_table, &self.gcl);
             println!(
-                "flow id = {:?}, route = {:?} cost = {}",
+                "flow id = {:?}, route = {:?} avb cost = {:?}",
                 flow.id, route, cost
             );
         }
-        println!("total avb cost = {}", self.compute_all_avb_cost().1);
+        let all_cost = compute_all_avb_cost(self, &self.flow_table, &self.gcl);
+        println!("total avb cost = {:?} / {}", all_cost, self.flow_table.get_avb_cnt());
     }
     fn get_last_compute_time(&self) -> u128 {
         self.compute_time
@@ -115,12 +116,6 @@ impl<'a> RoutingAlgo for AdamsAnt<'a> {
 }
 
 impl<'a> AdamsAnt<'a> {
-    pub fn compute_avb_cost(&self, flow: &AVBFlow, k: Option<usize>) -> AVBCostResult {
-        compute_avb_cost(self, flow, k, &self.flow_table, &self.gcl)
-    }
-    pub fn compute_all_avb_cost(&self) -> AVBCostResult {
-        compute_all_avb_cost(self, &self.flow_table, &self.gcl)
-    }
     pub fn add_flows_in_time(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>, t_limit: u128) {
         let new_ids = self.flow_table.insert(tsns, avbs, 0);
         let mut reconf = self.flow_table.clone_as_diff();

@@ -9,8 +9,13 @@ pub const MAX_QUEUE: u8 = 8;
 pub const MAX_K: usize = 20;
 pub const T_LIMIT: u128 = 1000 * 1000; // micro_sec
 
+/// TSN 排程失敗
+pub const W0: f64 = 1000.0;
+/// AVB 排程失敗的數量
 pub const W1: f64 = 100.0;
+/// AVB 的平均 Worst case delay
 pub const W2: f64 = 1.0;
+/// 重排路徑的成本
 pub const W3: f64 = 1.0;
 
 pub const FAST_STOP: bool = true;
