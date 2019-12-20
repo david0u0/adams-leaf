@@ -8,9 +8,11 @@ const MAX_AVB_SETTING: f64 = 0.75;
 const MAX_BE_SIZE: f64 = 1500.0;
 
 /// 計算 AVB 資料流的端對端延遲（包含 TT、BE 及其它 AVB 所造成的延遲）
-/// * `g` - 全局的網路拓撲
+/// * `g` - 全局網路拓撲，每條邊上記錄其承載哪些資料流
 /// * `flow` - 該 AVB 資料流的詳細資訊
 /// * `route` - 該 AVB 資料流的路徑
+/// * `flow_table` - 資料流表。需注意的是，這裡僅用了資料流本身的資料，而未使用其隨附資訊
+/// TODO: 改用 FlowArena?
 /// * `gcl` - 所有 TT 資料流的 Gate Control List
 pub fn compute_avb_latency<T: Clone>(
     g: &StreamAwareGraph,

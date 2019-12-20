@@ -1,18 +1,12 @@
 use std::time::Instant;
 
-use super::super::flow_table_prelude::*;
-use super::{compute_all_avb_cost, compute_avb_cost, AVBCostResult, AdamsAnt, FlowID};
+use super::super::{flow_table_prelude::*, FlowID};
+use super::{compute_all_avb_cost, compute_avb_cost, AVBCostResult, AdamsAnt, OldNew};
 use crate::util::aco::{ACOJudgeResult, ACO};
 use crate::{FAST_STOP, MAX_K, W0, W1, W2, W3};
 
 const TSN_MEMORY: f64 = 3.0; // 計算能見度時，TSN 對舊路徑的偏好程度
 const AVB_MEMORY: f64 = 3.0; // 計算能見度時，AVB 對舊路徑的偏好程度
-
-#[derive(Clone, Copy)]
-enum OldNew {
-    Old(usize),
-    New,
-}
 
 pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128, reconf: DiffFlowTable<usize>) {
     let time = Instant::now();
@@ -40,6 +34,7 @@ pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128, reconf: DiffFlowTable<usize
         (*_self)
             .schedule_online(&mut algo.gcl, &mut algo.flow_table, &reconf)
             .expect("TT走最短路徑無法排程");
+        // TODO: 好好處理這個錯誤
     }
 
     let mut best_dist = std::f64::MAX;
@@ -65,7 +60,7 @@ fn compute_visibility(algo: &AdamsAnt, old_new_table: &FlowTable<OldNew>) -> Vec
         let id = flow.id;
         for i in 0..algo.get_candidate_count(flow) {
             vis[id.0][i] =
-                1.0 / compute_avb_cost(algo, flow, Some(i), &algo.flow_table, &algo.gcl).1;
+                1.0 / compute_avb_cost(algo, flow, Some(i), &algo.flow_table, &algo.gcl, None).1;
         }
         if let Some(OldNew::Old(route_k)) = old_new_table.get_info(flow.id) {
             // 是舊資料流，調高本來路徑的能見度
@@ -138,7 +133,7 @@ unsafe fn compute_aco_dist(
             }
         }
     }
-    let (cost1, cost2, cost3) = compute_all_avb_cost(algo, &table, &gcl);
+    let (cost1, cost2, cost3) = compute_all_avb_cost(algo, &table, &gcl, Some(old_new_table));
 
     let cost = W0 * cost0
         + (W1 * cost1 as f64 + W2 * cost2 + W3 * cost3 as f64) / table.get_avb_cnt() as f64;

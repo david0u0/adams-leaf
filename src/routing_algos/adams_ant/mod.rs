@@ -11,6 +11,12 @@ use crate::util::aco::ACO;
 use crate::util::YensAlgo;
 use crate::T_LIMIT;
 
+#[derive(Clone, Copy)]
+pub(self) enum OldNew {
+    Old(usize),
+    New,
+}
+
 mod cost_calculate;
 pub(self) use cost_calculate::{compute_all_avb_cost, compute_avb_cost, AVBCostResult};
 
@@ -101,14 +107,18 @@ impl<'a> RoutingAlgo for AdamsAnt<'a> {
         println!("AVB Flows:");
         for (flow, &route_k) in self.flow_table.iter_avb() {
             let route = self.get_kth_route(flow, route_k);
-            let cost = compute_avb_cost(self, flow, None, &self.flow_table, &self.gcl);
+            let cost = compute_avb_cost(self, flow, None, &self.flow_table, &self.gcl, None);
             println!(
                 "flow id = {:?}, route = {:?} avb cost = {:?}",
                 flow.id, route, cost
             );
         }
-        let all_cost = compute_all_avb_cost(self, &self.flow_table, &self.gcl);
-        println!("total avb cost = {:?} / {}", all_cost, self.flow_table.get_avb_cnt());
+        let all_cost = compute_all_avb_cost(self, &self.flow_table, &self.gcl, None);
+        println!(
+            "total avb cost = {:?} / {}",
+            all_cost,
+            self.flow_table.get_avb_cnt()
+        );
     }
     fn get_last_compute_time(&self) -> u128 {
         self.compute_time
