@@ -1,4 +1,4 @@
-use super::super::flow::{Flow, FlowID};
+use crate::flow::{Flow, FlowID};
 
 pub enum Iter<'a, D: Clone, T: Clone> {
     FlowTable {

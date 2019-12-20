@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::flow::FlowID;
 use crate::graph_util::{Graph, OnOffGraph};
-use crate::routing_algos::flow::FlowID;
 
 struct Node {
     is_switch: bool,

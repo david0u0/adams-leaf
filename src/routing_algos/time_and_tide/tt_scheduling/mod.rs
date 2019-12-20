@@ -1,4 +1,5 @@
-use super::super::{flow::FlowID, flow_table_prelude::*, TSNFlow, GCL};
+use crate::flow::{FlowID, TSNFlow};
+use crate::recorder::{flow_table::prelude::*, GCL};
 use crate::MAX_QUEUE;
 
 type FT<T> = FlowTable<T>;

@@ -1,5 +1,5 @@
-use super::super::super::{flow::TSNData, flow_table_prelude::*, GCL};
 use super::*;
+use crate::flow::data::TSNData;
 
 type Info = Vec<(usize, f64)>;
 type FT = FlowTable<Info>;

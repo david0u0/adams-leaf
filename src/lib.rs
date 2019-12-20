@@ -2,7 +2,9 @@ use std::fs;
 extern crate serde_json;
 use serde::{Deserialize, Serialize};
 
+pub mod flow;
 pub mod graph_util;
+pub mod recorder;
 pub mod routing_algos;
 pub mod util;
 pub const MAX_QUEUE: u8 = 8;
@@ -20,7 +22,7 @@ pub const W3: f64 = 1.0;
 
 pub const FAST_STOP: bool = true;
 
-use routing_algos::{flow, AVBFlow, TSNFlow};
+use flow::{AVBFlow, TSNFlow};
 
 pub fn read_flows_from_file(file_name: &str, times: usize) -> (Vec<TSNFlow>, Vec<AVBFlow>) {
     let mut tsns = Vec::<TSNFlow>::new();
@@ -42,7 +44,7 @@ fn read_flows_from_file_once(tsns: &mut Vec<TSNFlow>, avbs: &mut Vec<AVBFlow>, f
             dst: cur_flow.dst,
             period: cur_flow.period,
             max_delay: cur_flow.max_delay,
-            spec_data: flow::TSNData {
+            spec_data: flow::data::TSNData {
                 offset: cur_flow.offset,
             },
         });
@@ -55,11 +57,11 @@ fn read_flows_from_file_once(tsns: &mut Vec<TSNFlow>, avbs: &mut Vec<AVBFlow>, f
             dst: cur_flow.dst,
             period: cur_flow.period,
             max_delay: cur_flow.max_delay,
-            spec_data: flow::AVBData {
+            spec_data: flow::data::AVBData {
                 avb_class: if cur_flow.avb_type == 'A' {
-                    flow::AVBClass::A
+                    flow::data::AVBClass::A
                 } else if cur_flow.avb_type == 'B' {
-                    flow::AVBClass::A
+                    flow::data::AVBClass::B
                 } else {
                     panic!("AVB type 必需為 `A` 或 `B`");
                 },

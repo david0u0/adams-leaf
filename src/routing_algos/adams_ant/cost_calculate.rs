@@ -1,5 +1,7 @@
-use super::super::{flow_table_prelude::*, time_and_tide::compute_avb_latency, AVBFlow, GCL};
+use super::super::time_and_tide::compute_avb_latency;
 use super::{AdamsAnt, OldNew};
+use crate::flow::AVBFlow;
+use crate::recorder::{flow_table::prelude::*, GCL};
 
 type FT<T> = FlowTable<T>;
 

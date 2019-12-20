@@ -1,8 +1,8 @@
-use super::super::{
-    flow::{AVBData, Flow, FlowID, TSNData},
-    AVBFlow, TSNFlow,
-};
 use super::{Iter, IterMut};
+use crate::flow::{
+    data::{AVBData, TSNData},
+    AVBFlow, FlowID, TSNFlow,
+};
 use std::rc::Rc;
 
 #[derive(Clone, Copy)]

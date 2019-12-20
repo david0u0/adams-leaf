@@ -1,12 +1,11 @@
-use super::time_and_tide::{compute_avb_latency, schedule_online};
 use super::{
-    flow::{Flow, FlowID},
-    flow_table_prelude::*,
-    AVBFlow, RoutingAlgo, TSNFlow, GCL,
+    time_and_tide::{compute_avb_latency, schedule_online},
+    RoutingAlgo,
 };
+use crate::flow::{AVBFlow, Flow, FlowID, TSNFlow};
 use crate::graph_util::{Graph, StreamAwareGraph};
+use crate::recorder::{flow_table::prelude::*, GCL};
 use crate::util::Dijkstra;
-
 use crate::{W1, W2, W3};
 
 pub struct SPF<'a> {

@@ -1,9 +1,9 @@
-use std::time::Instant;
-
-use super::super::{flow_table_prelude::*, FlowID};
 use super::{compute_all_avb_cost, compute_avb_cost, AVBCostResult, AdamsAnt, OldNew};
+use crate::flow::FlowID;
+use crate::recorder::flow_table::prelude::*;
 use crate::util::aco::{ACOJudgeResult, ACO};
 use crate::{FAST_STOP, MAX_K, W0, W1, W2, W3};
+use std::time::Instant;
 
 const TSN_MEMORY: f64 = 3.0; // 計算能見度時，TSN 對舊路徑的偏好程度
 const AVB_MEMORY: f64 = 3.0; // 計算能見度時，AVB 對舊路徑的偏好程度
