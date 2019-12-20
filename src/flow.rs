@@ -57,3 +57,37 @@ pub struct Flow<T: Clone> {
 
 pub type TSNFlow = Flow<data::TSNData>;
 pub type AVBFlow = Flow<data::AVBData>;
+
+pub enum FlowEnum {
+    TSN(TSNFlow),
+    AVB(AVBFlow),
+}
+
+impl Into<FlowEnum> for Flow<data::TSNData> {
+    fn into(self) -> FlowEnum {
+        FlowEnum::TSN(self)
+    }
+}
+impl Into<FlowEnum> for Flow<data::AVBData> {
+    fn into(self) -> FlowEnum {
+        FlowEnum::AVB(self)
+    }
+}
+impl<'a> From<&'a FlowEnum> for &'a Flow<data::TSNData> {
+    fn from(flow_enum: &'a FlowEnum) -> &'a TSNFlow {
+        if let FlowEnum::TSN(flow) = flow_enum {
+            flow
+        } else {
+            panic!("轉型為 TSN 資料流失敗");
+        }
+    }
+}
+impl<'a> From<&'a FlowEnum> for &'a Flow<data::AVBData> {
+    fn from(flow_enum: &'a FlowEnum) -> &'a AVBFlow {
+        if let FlowEnum::AVB(flow) = flow_enum {
+            flow
+        } else {
+            panic!("轉型為 AVB 資料流失敗");
+        }
+    }
+}
