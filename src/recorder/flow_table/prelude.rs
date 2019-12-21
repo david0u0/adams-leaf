@@ -39,20 +39,6 @@ impl FlowArena {
         }
         return None;
     }
-    fn get_avb(&self, id: FlowID) -> Option<&AVBFlow> {
-        if let Some(FlowEnum::AVB(flow)) = self.get(id) {
-            Some(flow)
-        } else {
-            None
-        }
-    }
-    fn get_tsn(&self, id: FlowID) -> Option<&TSNFlow> {
-        if let Some(FlowEnum::TSN(flow)) = self.get(id) {
-            Some(flow)
-        } else {
-            None
-        }
-    }
 }
 
 pub trait IFlowTable {
@@ -63,19 +49,24 @@ pub trait IFlowTable {
     fn check_exist(&self, id: FlowID) -> bool {
         self.get_info(id).is_some()
     }
+    fn get(&self, id: FlowID) -> Option<&FlowEnum> {
+        self.get_inner_arena().get(id)
+    }
     fn get_avb(&self, id: FlowID) -> Option<&AVBFlow> {
         if self.check_exist(id) {
-            self.get_inner_arena().get_avb(id)
-        } else {
-            None
+            if let Some(FlowEnum::AVB(flow)) = self.get_inner_arena().get(id) {
+                return Some(flow);
+            }
         }
+        None
     }
     fn get_tsn(&self, id: FlowID) -> Option<&TSNFlow> {
         if self.check_exist(id) {
-            self.get_inner_arena().get_tsn(id)
-        } else {
-            None
+            if let Some(FlowEnum::TSN(flow)) = self.get_inner_arena().get(id) {
+                return Some(flow);
+            }
         }
+        None
     }
     fn is_same_flow_list<T: IFlowTable<INFO = Self::INFO>>(&self, other: &T) -> bool {
         let a = &**self.get_inner_arena() as *const FlowArena;
@@ -142,15 +133,15 @@ impl<T: Clone> FlowTable<T> {
             tsn_cnt: 0,
         }
     }
-    pub fn map_as<U: Clone, F: Fn(FlowID, &T) -> U>(&self, func: F) -> FlowTable<U> {
+    pub fn clone_as_type<U: Clone, F: Fn(FlowID, &T) -> U>(&self, transform: F) -> FlowTable<U> {
         let infos = self
             .infos
             .iter()
             .enumerate()
-            .map(|(i, t)| t.as_ref().map(|t| func(FlowID(i), t)))
+            .map(|(i, t)| t.as_ref().map(|t| transform(FlowID(i), t)))
             .collect();
         FlowTable {
-            arena: Rc::new(FlowArena::new()),
+            arena: self.arena.clone(),
             avb_cnt: self.avb_cnt,
             tsn_cnt: self.tsn_cnt,
             infos,
@@ -170,30 +161,27 @@ impl<T: Clone> FlowTable<T> {
             }
         }
     }
-    pub fn insert<'a>(
-        &'a mut self,
+    pub fn insert(
+        &mut self,
         tsns: Vec<TSNFlow>,
         avbs: Vec<AVBFlow>,
         default_info: T,
     ) -> Vec<FlowID> {
-        if let Some(arena) = Rc::get_mut(&mut self.arena) {
-            let mut id_list = vec![];
-            for flow in tsns.into_iter() {
-                let id = arena.insert(flow);
-                self.infos.push(Some(default_info.clone()));
-                id_list.push(id);
-                self.tsn_cnt += 1;
-            }
-            for flow in avbs.into_iter() {
-                let id = arena.insert(flow);
-                self.infos.push(Some(default_info.clone()));
-                id_list.push(id);
-                self.avb_cnt += 1;
-            }
-            id_list
-        } else {
-            panic!("插入資料流時發生數據爭用");
+        let arena = Rc::get_mut(&mut self.arena).expect("插入資料流時發生數據爭用");
+        let mut id_list = vec![];
+        for flow in tsns.into_iter() {
+            let id = arena.insert(flow);
+            self.infos.push(Some(default_info.clone()));
+            id_list.push(id);
+            self.tsn_cnt += 1;
         }
+        for flow in avbs.into_iter() {
+            let id = arena.insert(flow);
+            self.infos.push(Some(default_info.clone()));
+            id_list.push(id);
+            self.avb_cnt += 1;
+        }
+        id_list
     }
 }
 impl<T: Clone> IFlowTable for FlowTable<T> {
@@ -466,13 +454,13 @@ mod test {
         assert!(!first);
     }
     #[test]
-    fn test_map_as() {
+    fn test_clone_as_type() {
         let mut table = FlowTable::<usize>::new();
         let (tsns, avbs) = read_flows_from_file("test_flow.json", 1);
         table.insert(tsns, avbs, 99);
         table.update_info(2.into(), 77);
 
-        let new_table = table.map_as(|id, t| {
+        let new_table = table.clone_as_type(|id, t| {
             if table.get_tsn(id).is_some() {
                 format!("tsn, id={}, og_value={}", id.0, t)
             } else {

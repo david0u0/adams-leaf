@@ -12,7 +12,7 @@ pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128, reconf: DiffFlowTable<usize
     let time = Instant::now();
     let aco = &mut algo.aco as *mut ACO;
     algo.g.forget_all_flows();
-    let old_new_table = algo.flow_table.map_as(|id, &t| {
+    let old_new_table = algo.flow_table.clone_as_type(|id, &t| {
         if reconf.check_exist(id) {
             OldNew::New
         } else {

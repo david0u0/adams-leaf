@@ -155,11 +155,9 @@ mod test {
             ),
             (MAX_BE_SIZE / 100.0 + 1.0 + 2.0)
         );
-        /*assert_eq!(
+        assert_eq!(
             wcd_on_single_link(
-                1.into(),
-                150,
-                class_a,
+                route_table.get_avb(1.into()).unwrap(),
                 100.0,
                 &route_table,
                 &build_flowid_vec(vec![1, 0, 2])
@@ -169,15 +167,13 @@ mod test {
 
         assert_eq!(
             wcd_on_single_link(
-                2.into(),
-                75,
-                class_b,
+                route_table.get_avb(2.into()).unwrap(),
                 100.0,
                 &route_table,
                 &build_flowid_vec(vec![1, 0, 2])
             ),
             (MAX_BE_SIZE / 100.0 + 1.0 + 2.0 + 1.0)
-        );*/
+        );
     }
     #[test]
     fn test_endtoend_avb_without_gcl() {

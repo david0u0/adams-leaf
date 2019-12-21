@@ -60,6 +60,7 @@ pub(super) fn compute_all_avb_cost(
 fn is_old_route(flow: &AVBFlow, route: usize, old_new_table: Option<&FT<OldNew>>) -> bool {
     if let Some(old_new_table) = old_new_table {
         if let OldNew::Old(old_route) = old_new_table.get_info(flow.id).unwrap() {
+            println!("{}", route);
             return *old_route == route;
         }
     }
