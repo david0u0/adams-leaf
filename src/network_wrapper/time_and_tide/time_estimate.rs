@@ -1,6 +1,5 @@
-use crate::flow::AVBFlow;
-use crate::flow::FlowID;
-use crate::graph_util::StreamAwareGraph;
+use crate::flow::{AVBFlow, FlowID};
+use crate::graph_util::MemorizingGraph;
 use crate::recorder::{flow_table::prelude::*, GCL};
 
 /// AVB 資料流最多可以佔用的資源百分比（模擬 Credit Base Shaper 的效果）
@@ -15,8 +14,8 @@ const MAX_BE_SIZE: f64 = 1500.0;
 /// * `flow_table` - 資料流表。需注意的是，這裡僅用了資料流本身的資料，而未使用其隨附資訊
 /// TODO: 改用 FlowArena?
 /// * `gcl` - 所有 TT 資料流的 Gate Control List
-pub fn compute_avb_latency<T: Clone>(
-    g: &StreamAwareGraph,
+pub fn compute_avb_latency<T: Clone + Eq>(
+    g: &MemorizingGraph,
     flow: &AVBFlow,
     route: &Vec<usize>,
     flow_table: &FlowTable<T>,
@@ -30,7 +29,7 @@ pub fn compute_avb_latency<T: Clone>(
     }
     end_to_end_lanency as u32
 }
-fn wcd_on_single_link<T: Clone>(
+fn wcd_on_single_link<T: Clone + Eq>(
     flow: &AVBFlow,
     bandwidth: f64,
     flow_table: &FlowTable<T>,
@@ -83,7 +82,7 @@ mod test {
     use super::*;
     use crate::graph_util::*;
 
-    fn init_settings() -> (StreamAwareGraph, Vec<AVBFlow>, FlowTable<usize>, GCL) {
+    fn init_settings() -> (MemorizingGraph, Vec<AVBFlow>, FlowTable<usize>, GCL) {
         use crate::flow::data::{AVBClass, AVBData};
         let mut g = StreamAwareGraph::new();
         g.add_host(Some(3));
@@ -126,7 +125,7 @@ mod test {
         ];
         let flow_table = FlowTable::new();
         let gcl = GCL::new(10, g.get_edge_cnt());
-        (g, flows, flow_table, gcl)
+        (MemorizingGraph::new(g), flows, flow_table, gcl)
     }
     fn build_flowid_vec(v: Vec<usize>) -> Vec<FlowID> {
         v.into_iter().map(|i| i.into()).collect()
@@ -155,11 +154,9 @@ mod test {
             ),
             (MAX_BE_SIZE / 100.0 + 1.0 + 2.0)
         );
-        /*assert_eq!(
+        assert_eq!(
             wcd_on_single_link(
-                1.into(),
-                150,
-                class_a,
+                route_table.get_avb(1.into()).unwrap(),
                 100.0,
                 &route_table,
                 &build_flowid_vec(vec![1, 0, 2])
@@ -169,15 +166,13 @@ mod test {
 
         assert_eq!(
             wcd_on_single_link(
-                2.into(),
-                75,
-                class_b,
+                route_table.get_avb(2.into()).unwrap(),
                 100.0,
                 &route_table,
                 &build_flowid_vec(vec![1, 0, 2])
             ),
             (MAX_BE_SIZE / 100.0 + 1.0 + 2.0 + 1.0)
-        );*/
+        );
     }
     #[test]
     fn test_endtoend_avb_without_gcl() {

@@ -168,7 +168,7 @@ impl ACO {
         }
         #[cfg(debug_assertions)]
         println!("ACO epoch = {}", epoch);
-        best_state.state.unwrap()
+        best_state.state.expect("找不到最好的解")
     }
     fn do_single_epoch<F>(
         &mut self,

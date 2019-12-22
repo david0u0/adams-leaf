@@ -12,17 +12,17 @@ use crate::graph_util::OnOffGraph;
 
 type Path<K> = (f64, Vec<K>);
 
-pub struct YensAlgo<'a, K: Hash + Eq + Copy, G: OnOffGraph<K>> {
+pub struct YensAlgo<K: Hash + Eq + Copy, G: OnOffGraph<K>> {
     g: G,
     k: usize,
     // TODO 這個 Vec<Path> 的結構是兩層向量，有優化空間
     route_table: HashMap<(K, K), Vec<Path<K>>>,
-    dijkstra_algo: Dijkstra<'a, K, G>,
+    dijkstra_algo: Dijkstra<K, G>,
     rng: ThreadRng,
 }
 
-impl<'a, K: Hash + Eq + Copy + Debug, G: OnOffGraph<K>> YensAlgo<'a, K, G> {
-    pub fn new(g: &'a G, k: usize) -> Self {
+impl<K: Hash + Eq + Copy + Debug, G: OnOffGraph<K>> YensAlgo<K, G> {
+    pub fn new(g: G, k: usize) -> Self {
         return YensAlgo {
             k,
             rng: rand::thread_rng(),
@@ -131,7 +131,7 @@ impl<'a, K: Hash + Eq + Copy + Debug, G: OnOffGraph<K>> YensAlgo<'a, K, G> {
                 }
             }
             // TODO 這裡是不是有優化的空間?
-            let mut spf = Dijkstra::new(&self.g);
+            let mut spf = Dijkstra::new(self.g.clone());
             if let Some((_, postfix)) = spf.get_route(cur_node, last_node) {
                 let mut next_path = prefix.clone();
                 next_path.extend(postfix);
@@ -167,7 +167,7 @@ mod test {
             }
         }
 
-        let mut algo = YensAlgo::new(&g, 10);
+        let mut algo = YensAlgo::new(g, 10);
         algo.compute_routes(0, 2);
         assert_eq!(&vec![0, 1, 2], algo.get_kth_route(0, 2, 0));
         assert_eq!(&vec![0, 1, 3, 2], algo.get_kth_route(0, 2, 1));

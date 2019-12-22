@@ -1,7 +1,7 @@
 use super::*;
 use crate::flow::data::TSNData;
 
-type Info = Vec<(usize, f64)>;
+type Info = Vec<(usize, usize)>;
 type FT = FlowTable<Info>;
 
 /**
@@ -21,7 +21,7 @@ type FT = FlowTable<Info>;
  */
 
 fn gen_links(ids: Vec<usize>) -> Info {
-    ids.into_iter().map(|id| (id, MTU as f64)).collect()
+    ids.into_iter().map(|id| (id, MTU)).collect()
 }
 fn gen_flow_table() -> FT {
     let mut ft = FlowTable::new();
@@ -73,19 +73,22 @@ fn gen_flow_table() -> FT {
     ft.update_info(3.into(), gen_links(vec![1, 5, 6, 7]));
     ft
 }
+fn to_links(vec: &Vec<(usize, usize)>) -> Vec<(usize, f64)> {
+    vec.iter().map(|(a, b)| (*a, *b as f64)).collect()
+}
 
 #[test]
 fn simple_calculate_offset() {
     let gcl = GCL::new(60, 16);
     let ft = gen_flow_table();
     let flow = ft.get_tsn(0.into()).unwrap();
-    let links = ft.get_info(0.into()).unwrap();
-    let a = calculate_offsets(&flow, &vec![], links, &vec![0; 2], &gcl);
+    let links = to_links(ft.get_info(0.into()).unwrap());
+    let a = calculate_offsets(&flow, &vec![], &links, &vec![0; 2], &gcl);
     assert_eq!(vec![0, 1], a);
 
     let flow = ft.get_tsn(2.into()).unwrap();
-    let links = ft.get_info(2.into()).unwrap();
-    let a = calculate_offsets(&flow, &vec![], links, &vec![0; 3], &gcl);
+    let links = to_links(ft.get_info(2.into()).unwrap());
+    let a = calculate_offsets(&flow, &vec![], &links, &vec![0; 3], &gcl);
     assert_eq!(vec![0, 1, 2], a);
 }
 #[test]
@@ -93,7 +96,7 @@ fn test_online_schedule() {
     let mut gcl = GCL::new(600, 16);
     let ft = gen_flow_table();
 
-    schedule_fixed_og(&ft, &mut gcl, |_, info| info.clone()).unwrap();
+    schedule_fixed_og(&ft, &mut gcl, |_, info| to_links(info)).unwrap();
     //schedule_online(&ft, &ft, &mut gcl, |_, info| info);
     let ans: Vec<(u32, u32)> = vec![(0, 5), (150, 3), (203, 2), (300, 3), (403, 2), (450, 3)];
     assert_eq!(gcl.get_gate_events(2), &ans);

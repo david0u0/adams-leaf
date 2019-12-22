@@ -1,78 +1,53 @@
-use super::{time_and_tide::schedule_online, RoutingAlgo};
-use crate::flow::{AVBFlow, Flow, FlowID, TSNFlow};
-use crate::graph_util::{Graph, StreamAwareGraph};
-use crate::recorder::{flow_table::prelude::*, GCL};
+use super::RoutingAlgo;
+use crate::flow::{AVBFlow, Flow, FlowEnum, FlowID, TSNFlow};
+use crate::graph_util::StreamAwareGraph;
+use crate::network_wrapper::NetworkWrapper;
+use crate::recorder::flow_table::prelude::*;
 use crate::util::aco::ACO;
 use crate::util::YensAlgo;
-use crate::T_LIMIT;
+use crate::{MAX_K, T_LIMIT};
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::time::Instant;
-
-#[derive(Clone, Copy)]
-pub(self) enum OldNew {
-    Old(usize),
-    New,
-}
-
-mod cost_calculate;
-pub(self) use cost_calculate::{compute_all_avb_cost, compute_avb_cost, AVBCostResult};
 
 mod aco_routing;
 use aco_routing::do_aco;
 
-type FT = FlowTable<usize>;
-type DT = DiffFlowTable<usize>;
-const K: usize = 20;
+fn get_src_dst(flow: &FlowEnum) -> (usize, usize) {
+    match flow {
+        FlowEnum::AVB(flow) => (flow.src, flow.dst),
+        FlowEnum::TSN(flow) => (flow.src, flow.dst),
+    }
+}
 
-pub struct AdamsAnt<'a> {
+pub struct AdamsAnt {
     aco: ACO,
-    g: StreamAwareGraph,
-    flow_table: FT,
-    yens_algo: YensAlgo<'a, usize, StreamAwareGraph>,
-    gcl: GCL,
+    yens_algo: Rc<RefCell<YensAlgo<usize, StreamAwareGraph>>>,
+    wrapper: NetworkWrapper<usize>,
     compute_time: u128,
 }
-impl<'a> AdamsAnt<'a> {
-    pub fn new(g: &'a StreamAwareGraph, flow_table: Option<FT>, gcl: Option<GCL>) -> Self {
-        let flow_table = flow_table.unwrap_or(FlowTable::new());
-        let gcl = gcl.unwrap_or(GCL::new(1, g.get_edge_cnt()));
+impl AdamsAnt {
+    pub fn new(g: StreamAwareGraph) -> Self {
+        let yens_algo = Rc::new(RefCell::new(YensAlgo::new(g.clone(), MAX_K)));
+        let tmp_yens = yens_algo.clone();
+        let wrapper = NetworkWrapper::new(g, move |flow_enum, &k| {
+            let (src, dst) = get_src_dst(flow_enum);
+            tmp_yens.borrow().get_kth_route(src, dst, k) as *const Vec<usize>
+        });
+
         AdamsAnt {
-            gcl,
-            flow_table,
-            aco: ACO::new(0, K, None),
-            g: g.clone(),
-            yens_algo: YensAlgo::new(g, K),
+            aco: ACO::new(0, MAX_K, None),
+            yens_algo,
             compute_time: 0,
+            wrapper,
         }
-    }
-    pub fn get_kth_route<T: Clone>(&self, flow: &Flow<T>, k: usize) -> &Vec<usize> {
-        self.yens_algo.get_kth_route(flow.src, flow.dst, k)
     }
     fn get_candidate_count<T: Clone>(&self, flow: &Flow<T>) -> usize {
-        self.yens_algo.get_route_count(flow.src, flow.dst)
-    }
-    fn schedule_online(
-        &self,
-        gcl: &mut GCL,
-        og_table: &mut FT,
-        changed_table: &DT,
-    ) -> Result<bool, ()> {
-        let _self = self as *const Self;
-        // TODO: 為什麼要這個 unsafe ?
-        unsafe {
-            schedule_online(og_table, changed_table, gcl, |flow, &k| {
-                let r = (*_self).get_kth_route(flow, k);
-                (*_self).g.get_links_id_bandwidth(r)
-            })
-        }
-    }
-    unsafe fn update_flowid_on_route(&self, remember: bool, flow: &AVBFlow, k: usize) {
-        let _g = &self.g as *const StreamAwareGraph as *mut StreamAwareGraph;
-        let route = self.get_kth_route(flow, k);
-        (*_g).update_flowid_on_route(remember, flow.id, route);
+        self.yens_algo.borrow().get_route_count(flow.src, flow.dst)
     }
 }
 
-impl<'a> RoutingAlgo for AdamsAnt<'a> {
+impl RoutingAlgo for AdamsAnt {
     fn add_flows(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>) {
         let init_time = Instant::now();
         self.add_flows_in_time(tsns, avbs, T_LIMIT);
@@ -85,63 +60,49 @@ impl<'a> RoutingAlgo for AdamsAnt<'a> {
         unimplemented!();
     }
     fn get_route(&self, id: FlowID) -> &Vec<usize> {
-        let k = *self.flow_table.get_info(id).unwrap();
-        if let Some(flow) = self.flow_table.get_avb(id) {
-            self.get_kth_route(flow, k)
-        } else if let Some(flow) = self.flow_table.get_tsn(id) {
-            self.get_kth_route(flow, k)
-        } else {
-            panic!("啥都找不到！")
-        }
+        self.wrapper.get_route(id)
     }
     fn show_results(&self) {
         println!("TT Flows:");
-        for (flow, &route_k) in self.flow_table.iter_tsn() {
-            let route = self.get_kth_route(flow, route_k);
+        for (flow, _) in self.wrapper.get_flow_table().iter_tsn() {
+            let route = self.get_route(flow.id);
             println!("flow id = {:?}, route = {:?}", flow.id, route);
         }
         println!("AVB Flows:");
-        for (flow, &route_k) in self.flow_table.iter_avb() {
-            let route = self.get_kth_route(flow, route_k);
-            let cost = compute_avb_cost(self, flow, None, &self.flow_table, &self.gcl, None);
+        for (flow, _) in self.wrapper.get_flow_table().iter_avb() {
+            let route = self.get_route(flow.id);
+            let cost = self.wrapper.compute_single_avb_cost(flow);
             println!(
-                "flow id = {:?}, route = {:?} avb cost = {:?}",
-                flow.id, route, cost
+                "flow id = {:?}, route = {:?} avb wcd / max latency = {:?}",
+                flow.id, route, cost.avb_wcd
             );
         }
-        let all_cost = compute_all_avb_cost(self, &self.flow_table, &self.gcl, None);
-        println!(
-            "total avb cost = {:?} / {}",
-            all_cost,
-            self.flow_table.get_avb_cnt()
-        );
+        let all_cost = self.wrapper.compute_all_cost();
+        println!("the cost structure = {:?}", all_cost,);
+        println!("{}", all_cost.compute());
     }
     fn get_last_compute_time(&self) -> u128 {
         self.compute_time
     }
 }
 
-impl<'a> AdamsAnt<'a> {
+impl AdamsAnt {
     pub fn add_flows_in_time(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>, t_limit: u128) {
-        let new_ids = self.flow_table.insert(tsns, avbs, 0);
-        let mut reconf = self.flow_table.clone_as_diff();
-
-        for &id in new_ids.iter() {
-            reconf.update_info(id, 0);
-            if let Some(flow) = self.flow_table.get_avb(id) {
-                self.yens_algo.compute_routes(flow.src, flow.dst);
-            } else if let Some(flow) = self.flow_table.get_tsn(id) {
-                self.yens_algo.compute_routes(flow.src, flow.dst);
-            }
+        for flow in tsns.iter() {
+            self.yens_algo
+                .borrow_mut()
+                .compute_routes(flow.src, flow.dst);
         }
+        for flow in avbs.iter() {
+            self.yens_algo
+                .borrow_mut()
+                .compute_routes(flow.src, flow.dst);
+        }
+        self.wrapper.insert(tsns, avbs, 0);
 
         self.aco
-            .extend_state_len(self.flow_table.get_max_id().0 + 1);
+            .extend_state_len(self.wrapper.get_flow_table().get_max_id().0 + 1);
 
-        do_aco(self, t_limit, reconf);
-        self.g.forget_all_flows();
-        for (flow, &r) in self.flow_table.iter_avb() {
-            unsafe { self.update_flowid_on_route(true, flow, r) }
-        }
+        do_aco(self, t_limit);
     }
 }
