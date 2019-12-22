@@ -1,8 +1,7 @@
 use super::{compute_avb_latency, NetworkWrapper, OldNew, OldNewTable};
+use crate::config::Config;
 use crate::flow::{AVBFlow, FlowEnum};
 use crate::recorder::flow_table::prelude::*;
-use crate::{W0, W1, W2, W3};
-use std::cmp::Ordering;
 
 #[derive(Clone, Copy, Debug)]
 pub struct RoutingCost {
@@ -16,16 +15,18 @@ pub struct RoutingCost {
 
 impl RoutingCost {
     pub fn compute(&self) -> f64 {
+        let config = Config::get();
         let cost = self.compute_without_reroute_cost();
-        cost + W3 * self.reroute_overhead as f64 / (self.avb_cnt + self.tsn_cnt) as f64
+        cost + config.w3 * self.reroute_overhead as f64 / (self.avb_cnt + self.tsn_cnt) as f64
     }
     pub fn compute_without_reroute_cost(&self) -> f64 {
+        let config = Config::get();
         let mut cost = 0.0;
         if self.tsn_schedule_fail {
-            cost += W0;
+            cost += config.w0;
         }
-        cost += W1 * self.avb_fail_cnt as f64 / self.avb_cnt as f64;
-        cost += W2 * self.avb_wcd / self.avb_cnt as f64;
+        cost += config.w1 * self.avb_fail_cnt as f64 / self.avb_cnt as f64;
+        cost += config.w2 * self.avb_wcd / self.avb_cnt as f64;
         cost
     }
 }

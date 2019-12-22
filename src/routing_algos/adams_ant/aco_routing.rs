@@ -1,12 +1,10 @@
 use super::AdamsAnt;
+use crate::config::Config;
 use crate::network_wrapper::RoutingCost;
 use crate::recorder::flow_table::prelude::*;
 use crate::util::aco::{ACOJudgeResult, ACO};
-use crate::{FAST_STOP, MAX_K};
+use crate::MAX_K;
 use std::time::Instant;
-
-const TSN_MEMORY: f64 = 3.0; // 計算能見度時，TSN 對舊路徑的偏好程度
-const AVB_MEMORY: f64 = 3.0; // 計算能見度時，AVB 對舊路徑的偏好程度
 
 pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128) {
     let time = Instant::now();
@@ -18,7 +16,7 @@ pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128) {
     let new_state = unsafe {
         (*aco).do_aco(time_limit - time.elapsed().as_micros(), &vis, |state| {
             let (cost, dist) = compute_aco_dist(algo, state, &mut best_dist);
-            if cost.avb_fail_cnt == 0 && FAST_STOP {
+            if cost.avb_fail_cnt == 0 && Config::get().fast_stop {
                 // 找到可行解，且為快速終止模式
                 ACOJudgeResult::Stop(dist)
             } else {
@@ -29,6 +27,7 @@ pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128) {
 }
 
 fn compute_visibility(algo: &AdamsAnt) -> Vec<[f64; MAX_K]> {
+    let config = Config::get();
     // TODO 好好設計能見度函式！
     // 目前：路徑長的倒數
     let len = algo.aco.get_state_len();
@@ -40,7 +39,7 @@ fn compute_visibility(algo: &AdamsAnt) -> Vec<[f64; MAX_K]> {
         }
         if let Some(&route_k) = algo.wrapper.get_old_route(id) {
             // 是舊資料流，調高本來路徑的能見度
-            vis[id.0][route_k] *= AVB_MEMORY;
+            vis[id.0][route_k] *= config.avb_memory;
         }
     }
     for (flow, _) in algo.wrapper.get_flow_table().iter_tsn() {
@@ -53,7 +52,7 @@ fn compute_visibility(algo: &AdamsAnt) -> Vec<[f64; MAX_K]> {
 
         if let Some(&route_k) = algo.wrapper.get_old_route(id) {
             // 是舊資料流，調高本來路徑的能見度
-            vis[id.0][route_k] *= TSN_MEMORY;
+            vis[id.0][route_k] *= config.tsn_memory;
         }
     }
     vis

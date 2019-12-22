@@ -1,10 +1,10 @@
 use super::RoutingAlgo;
+use crate::config::Config;
 use crate::flow::{AVBFlow, Flow, FlowEnum, FlowID, TSNFlow};
 use crate::graph_util::StreamAwareGraph;
 use crate::network_wrapper::{NetworkWrapper, RoutingCost};
 use crate::recorder::flow_table::prelude::*;
 use crate::util::YensAlgo;
-use crate::FAST_STOP;
 use crate::{MAX_K, T_LIMIT};
 use rand::Rng;
 use std::cell::RefCell;
@@ -75,7 +75,7 @@ impl RO {
 
             println!("start iteration #{}", iter_times);
             self.hill_climbing(&time, &mut min_cost, cur_wrapper);
-            if min_cost.avb_fail_cnt == 0 && FAST_STOP {
+            if min_cost.avb_fail_cnt == 0 && Config::get().fast_stop {
                 // 找到可行解，且為快速終止模式
                 break;
             }
@@ -143,7 +143,7 @@ impl RO {
                 iter_times = 0;
                 println!("found min_cost = {:?}", cost);
 
-                if cost.avb_fail_cnt == 0 && FAST_STOP {
+                if cost.avb_fail_cnt == 0 && Config::get().fast_stop {
                     return; // 找到可行解，返回
                 }
             } else {
