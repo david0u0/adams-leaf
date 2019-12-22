@@ -1,4 +1,4 @@
-use super::{compute_avb_latency, NetworkWrapper, OldNew, OldNewTable, Route};
+use super::{compute_avb_latency, NetworkWrapper, OldNew, OldNewTable};
 use crate::flow::{AVBFlow, FlowEnum};
 use crate::recorder::flow_table::prelude::*;
 use crate::{W0, W1, W2, W3};

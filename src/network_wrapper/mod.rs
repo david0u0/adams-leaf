@@ -1,7 +1,6 @@
 use crate::flow::{AVBFlow, FlowEnum, FlowID, TSNFlow};
 use crate::graph_util::{Graph, MemorizingGraph, StreamAwareGraph};
 use crate::recorder::{flow_table::prelude::*, GCL};
-use crate::routing_algos::time_and_tide::{compute_avb_latency, schedule_online};
 use std::rc::Rc;
 
 mod cost;
@@ -9,6 +8,8 @@ use cost::Calculator;
 pub use cost::RoutingCost;
 mod old_new_table;
 use old_new_table::{OldNew, OldNewTable};
+mod time_and_tide;
+use time_and_tide::{compute_avb_latency, schedule_online};
 
 type Route = Vec<usize>;
 

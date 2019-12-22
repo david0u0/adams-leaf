@@ -15,7 +15,5 @@ pub use shortest_path::SPF;
 mod routing_optimism;
 pub use routing_optimism::RO;
 
-pub mod time_and_tide;
-
 mod adams_ant;
 pub use adams_ant::AdamsAnt;

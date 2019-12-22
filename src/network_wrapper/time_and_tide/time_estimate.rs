@@ -1,5 +1,4 @@
-use crate::flow::AVBFlow;
-use crate::flow::FlowID;
+use crate::flow::{AVBFlow, FlowID};
 use crate::graph_util::MemorizingGraph;
 use crate::recorder::{flow_table::prelude::*, GCL};
 
