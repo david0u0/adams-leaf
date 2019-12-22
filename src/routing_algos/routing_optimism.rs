@@ -26,16 +26,16 @@ fn gen_n_distinct_outof_k(n: usize, k: usize) -> Vec<usize> {
     vec.into_iter().map(|(_, i)| i).take(n).collect()
 }
 
-pub struct RO<'a> {
+pub struct RO {
     g: MemorizingGraph,
     flow_table: FT,
-    yens_algo: YensAlgo<'a, usize, StreamAwareGraph>,
+    yens_algo: YensAlgo<usize, StreamAwareGraph>,
     gcl: GCL,
     compute_time: u128,
 }
 
-impl<'a> RO<'a> {
-    pub fn new(g: &'a StreamAwareGraph, flow_table: Option<FT>, gcl: Option<GCL>) -> Self {
+impl RO {
+    pub fn new(g: StreamAwareGraph, flow_table: Option<FT>, gcl: Option<GCL>) -> Self {
         let flow_table = flow_table.unwrap_or(FlowTable::new());
         let gcl = gcl.unwrap_or(GCL::new(1, g.get_edge_cnt()));
         RO {
@@ -213,7 +213,7 @@ impl<'a> RO<'a> {
         (*_g).update_flowid_on_route(remember, flow.id, route);
     }
 }
-impl<'a> RoutingAlgo for RO<'a> {
+impl RoutingAlgo for RO {
     fn add_flows(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>) {
         let init_time = Instant::now();
         let new_ids = self.flow_table.insert(tsns, avbs, 0);
@@ -221,7 +221,7 @@ impl<'a> RoutingAlgo for RO<'a> {
         unsafe {
             let _self = &mut *(self as *mut Self);
             for &id in new_ids.iter() {
-                reconf.update_info(id, 0); // 這裡好像不用管 avb，不過…管他的
+                reconf.update_info_force(id, 0); // 這裡好像不用管 avb，不過…管他的
                 if let Some(flow) = self.flow_table.get_avb(id) {
                     _self.yens_algo.compute_routes(flow.src, flow.dst);
                 } else if let Some(flow) = self.flow_table.get_tsn(id) {

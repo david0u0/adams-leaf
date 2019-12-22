@@ -1,17 +1,17 @@
 use super::{compute_avb_latency, NetworkWrapper, OldNew, OldNewTable, Route};
-use crate::flow::{AVBFlow, FlowEnum, FlowID};
-use crate::recorder::{flow_table::prelude::*, GCL};
+use crate::flow::{AVBFlow, FlowEnum};
+use crate::recorder::flow_table::prelude::*;
 use crate::{W0, W1, W2, W3};
 use std::cmp::Ordering;
 
 #[derive(Clone, Copy, Debug)]
 pub struct RoutingCost {
-    tsn_schedule_fail: bool,
-    avb_fail_cnt: u32,
-    avb_wcd: f64,
-    reroute_overhead: u32,
-    avb_cnt: usize,
-    tsn_cnt: usize,
+    pub tsn_schedule_fail: bool,
+    pub avb_fail_cnt: u32,
+    pub avb_wcd: f64,
+    pub reroute_overhead: u32,
+    pub avb_cnt: usize,
+    pub tsn_cnt: usize,
 }
 
 impl RoutingCost {
@@ -24,9 +24,6 @@ impl RoutingCost {
         cost += W2 * self.avb_wcd / self.avb_cnt as f64;
         cost += W3 * self.reroute_overhead as f64 / (self.avb_cnt + self.tsn_cnt) as f64;
         cost
-    }
-    pub fn avb_wcd(&self) -> f64 {
-        self.avb_wcd
     }
 }
 impl PartialEq for RoutingCost {
@@ -50,15 +47,44 @@ impl Ord for RoutingCost {
     }
 }
 
-pub trait Calculator {
-    fn _compute_avb_wcd(&self, flow: &AVBFlow) -> u32;
+pub trait Calculator<T: Clone + Eq> {
+    fn _compute_avb_wcd(&self, flow: &AVBFlow, route: Option<&T>) -> u32;
+    fn _compute_single_avb_cost(&self, flow: &AVBFlow) -> RoutingCost;
     fn _compute_all_cost(&self) -> RoutingCost;
 }
 
-impl<T: Clone + Eq> Calculator for NetworkWrapper<T> {
-    fn _compute_avb_wcd(&self, flow: &AVBFlow) -> u32 {
-        let route = self.get_route(flow.id);
+impl<T: Clone + Eq> Calculator<T> for NetworkWrapper<T> {
+    fn _compute_avb_wcd(&self, flow: &AVBFlow, route: Option<&T>) -> u32 {
+        let route_t = route.unwrap_or(self.flow_table.get_info(flow.id).unwrap());
+        let route = unsafe {
+            let r = (self.get_route_func)(self.flow_table.get(flow.id).unwrap(), route_t);
+            &*r
+        };
         compute_avb_latency(&self.graph, flow, route, &self.flow_table, &self.gcl)
+    }
+    fn _compute_single_avb_cost(&self, flow: &AVBFlow) -> RoutingCost {
+        let avb_wcd = self._compute_avb_wcd(flow, None) as f64 / flow.max_delay as f64;
+        let mut avb_fail_cnt = 0;
+        let mut reroute_cnt = 0;
+        if avb_wcd >= 1.0 {
+            // 逾時了！
+            avb_fail_cnt += 1;
+        }
+        if is_rerouted(
+            self.flow_table.get(flow.id).unwrap(),
+            self.flow_table.get_info(flow.id).unwrap(),
+            self.old_new_table.as_ref().unwrap(),
+        ) {
+            reroute_cnt += 1;
+        }
+        RoutingCost {
+            tsn_schedule_fail: self.tsn_fail,
+            avb_cnt: 1,
+            tsn_cnt: 0,
+            avb_fail_cnt,
+            avb_wcd,
+            reroute_overhead: reroute_cnt,
+        }
     }
     fn _compute_all_cost(&self) -> RoutingCost {
         let mut all_avb_fail_cnt = 0;
@@ -66,7 +92,7 @@ impl<T: Clone + Eq> Calculator for NetworkWrapper<T> {
         let mut all_reroute_cnt = 0;
         for (flow, t) in self.flow_table.iter() {
             if let FlowEnum::AVB(flow) = flow {
-                let wcd = self._compute_avb_wcd(flow);
+                let wcd = self._compute_avb_wcd(flow, None);
                 all_avb_wcd += wcd as f64 / flow.max_delay as f64;
                 if wcd > flow.max_delay {
                     // 逾時了！

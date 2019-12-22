@@ -1,4 +1,5 @@
 use super::iter::{Iter, IterMut};
+use super::OldNew;
 use crate::flow::{AVBFlow, FlowEnum, FlowID, TSNFlow};
 use std::rc::Rc;
 pub struct FlowArena {
@@ -42,7 +43,7 @@ impl FlowArena {
 }
 
 pub trait IFlowTable {
-    type INFO: Clone;
+    type INFO: Clone + Eq;
     fn get_inner_arena(&self) -> &Rc<FlowArena>;
     fn get_info(&self, id: FlowID) -> Option<&Self::INFO>;
     fn update_info(&mut self, id: FlowID, info: Self::INFO);
@@ -119,13 +120,13 @@ pub trait IFlowTable {
 ///
 /// TODO 觀察在大資料量下這個改動是否有優化的效果。在小資料量下似乎沒啥差別。
 #[derive(Clone)]
-pub struct FlowTable<T: Clone> {
+pub struct FlowTable<T: Clone + Eq> {
     arena: Rc<FlowArena>,
     infos: Vec<Option<T>>,
     avb_cnt: usize,
     tsn_cnt: usize,
 }
-impl<T: Clone> FlowTable<T> {
+impl<T: Clone + Eq> FlowTable<T> {
     pub fn new() -> Self {
         FlowTable {
             infos: vec![],
@@ -134,7 +135,10 @@ impl<T: Clone> FlowTable<T> {
             tsn_cnt: 0,
         }
     }
-    pub fn clone_as_type<U: Clone, F: Fn(FlowID, &T) -> U>(&self, transform: F) -> FlowTable<U> {
+    pub fn clone_as_type<U: Clone + Eq, F: Fn(FlowID, &T) -> U>(
+        &self,
+        transform: F,
+    ) -> FlowTable<U> {
         let infos = self
             .infos
             .iter()
@@ -185,7 +189,7 @@ impl<T: Clone> FlowTable<T> {
         id_list
     }
 }
-impl<T: Clone> IFlowTable for FlowTable<T> {
+impl<T: Clone + Eq> IFlowTable for FlowTable<T> {
     type INFO = T;
     fn get_avb_cnt(&self) -> usize {
         self.avb_cnt
@@ -247,26 +251,40 @@ impl<T: Clone> IFlowTable for FlowTable<T> {
 }
 
 #[derive(Clone)]
-pub struct DiffFlowTable<T: Clone> {
+pub struct DiffFlowTable<T: Clone + Eq> {
     avb_diff: Vec<FlowID>,
     tsn_diff: Vec<FlowID>,
-    table: FlowTable<T>,
+    table: FlowTable<OldNew<T>>,
 }
-impl<T: Clone> DiffFlowTable<T> {
+impl<T: Clone + Eq> DiffFlowTable<T> {
     pub fn new(og_table: &FlowTable<T>) -> Self {
         DiffFlowTable {
             avb_diff: vec![],
             tsn_diff: vec![],
             table: FlowTable {
                 arena: og_table.arena.clone(),
-                infos: vec![None; og_table.infos.len()],
+                infos: og_table
+                    .infos
+                    .iter()
+                    .map(|opt| opt.as_ref().map(|t| OldNew::Old(t.clone())))
+                    .collect(),
                 avb_cnt: 0,
                 tsn_cnt: 0,
             },
         }
     }
+    /// 不管是否和本來相同，硬是更新
+    pub fn update_info_force(&mut self, id: FlowID, info: T) {
+        if !self.check_exist(id) {
+            match self.table.get(id).unwrap() {
+                FlowEnum::TSN(_) => self.tsn_diff.push(id),
+                FlowEnum::AVB(_) => self.avb_diff.push(id),
+            }
+        }
+        self.table.update_info(id, OldNew::New(info));
+    }
 }
-impl<T: Clone> IFlowTable for DiffFlowTable<T> {
+impl<T: Clone + Eq> IFlowTable for DiffFlowTable<T> {
     type INFO = T;
     fn get_avb_cnt(&self) -> usize {
         self.avb_diff.len()
@@ -278,18 +296,25 @@ impl<T: Clone> IFlowTable for DiffFlowTable<T> {
         &self.table.get_inner_arena()
     }
     fn get_info(&self, id: FlowID) -> Option<&Self::INFO> {
-        self.table.get_info(id)
+        if let Some(OldNew::New(info)) = self.table.get_info(id) {
+            Some(info)
+        } else {
+            None
+        }
     }
     fn update_info(&mut self, id: FlowID, info: Self::INFO) {
-        // NOTE: 若 check_exist 有東西，就不記錄到 diff 裡（因為記錄過了）
-        let flow_enum = self.get_inner_arena().get(id).unwrap(); // 確保不會更新到「真的」不存在的資料流
-        if !self.check_exist(id) {
-            match flow_enum {
+        if let OldNew::Old(og_value) = self.table.get_info(id).unwrap() {
+            // NOTE: 若和本來值相同，就啥都不做
+            if og_value == &info {
+                return;
+            }
+            match self.table.get(id).unwrap() {
                 FlowEnum::TSN(_) => self.tsn_diff.push(id),
                 FlowEnum::AVB(_) => self.avb_diff.push(id),
             }
         }
-        self.table.update_info(id, info);
+        // NOTE: 如果本來就是 New，就不推進 diff 表（因為之前推過了）
+        self.table.update_info(id, OldNew::New(info));
     }
     fn clone_as_diff(&self) -> DiffFlowTable<T> {
         self.clone()

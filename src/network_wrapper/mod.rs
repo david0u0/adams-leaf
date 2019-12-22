@@ -38,21 +38,19 @@ impl<T: Clone + Eq> NetworkWrapper<T> {
         }
     }
     /// 插入新的資料流，同時會捨棄先前的新舊表，並創建另一份新舊表
-    pub fn insert(
-        &mut self,
-        tsns: Vec<TSNFlow>,
-        avbs: Vec<AVBFlow>,
-        default_info: T,
-    ) -> DiffFlowTable<T> {
+    pub fn insert(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>, default_info: T) {
         // 釋放舊的表備份表
         self.old_new_table = None;
         // 插入
         let new_ids = self.flow_table.insert(tsns, avbs, default_info.clone());
         let mut reconf = self.flow_table.clone_as_diff();
 
-        for &id in new_ids.iter() {
-            reconf.update_info(id, default_info.clone());
+        for &flow_id in new_ids.iter() {
+            reconf.update_info_force(flow_id, default_info.clone());
         }
+
+        self.update_avb(&reconf);
+        self.update_tsn(&reconf);
 
         let old_new_table = self.flow_table.clone_as_type(|id, t| {
             if reconf.check_exist(id) {
@@ -62,8 +60,6 @@ impl<T: Clone + Eq> NetworkWrapper<T> {
             }
         });
         self.old_new_table = Some(Rc::new(old_new_table));
-
-        reconf
     }
     pub fn get_route(&self, flow_id: FlowID) -> &Route {
         let flow_enum = self.flow_table.get(flow_id).unwrap();
@@ -71,16 +67,31 @@ impl<T: Clone + Eq> NetworkWrapper<T> {
         let route = (self.get_route_func)(flow_enum, info);
         unsafe { &*route }
     }
+    pub fn get_old_route(&self, flow_id: FlowID) -> Option<&T> {
+        if let OldNew::Old(t) = self
+            .old_new_table
+            .as_ref()
+            .unwrap()
+            .get_info(flow_id)
+            .unwrap()
+        {
+            Some(t)
+        } else {
+            None
+        }
+    }
     /// 更新 AVB 資料流表與圖上資訊
     pub fn update_avb(&mut self, diff: &DiffFlowTable<T>) {
         for (flow, info) in diff.iter_avb() {
             // NOTE: 因為 self.graph 與 self.get_route 是平行所有權
             let graph = unsafe { &mut (*(self as *mut Self)).graph };
             let og_route = self.get_route(flow.id);
+            // 忘掉舊的
             graph.update_flowid_on_route(false, flow.id, og_route);
             self.flow_table.update_info(flow.id, info.clone());
             let new_route = self.get_route(flow.id);
-            graph.update_flowid_on_route(false, flow.id, new_route);
+            // 記憶新的
+            graph.update_flowid_on_route(true, flow.id, new_route);
         }
     }
     /// 更新 TSN 資料流表與 GCL
@@ -117,11 +128,15 @@ impl<T: Clone + Eq> NetworkWrapper<T> {
     pub fn get_flow_table(&self) -> &FlowTable<T> {
         &self.flow_table
     }
-    pub fn compute_avb_wcd(&self, flow: &AVBFlow) -> u32 {
-        self._compute_avb_wcd(flow)
+    /// 路徑為可選參數，若不給代表照資料流表來走
+    pub fn compute_avb_wcd(&self, flow: &AVBFlow, route: Option<&T>) -> u32 {
+        self._compute_avb_wcd(flow, route)
     }
     pub fn compute_all_cost(&self) -> RoutingCost {
         self._compute_all_cost()
+    }
+    pub fn compute_single_avb_cost(&self, flow: &AVBFlow) -> RoutingCost {
+        self._compute_single_avb_cost(flow)
     }
 }
 
@@ -136,8 +151,8 @@ mod test {
     impl Env {
         pub fn new() -> Self {
             let mut map = HashMap::new();
-            map.insert((0, 2), vec![vec![0, 2], vec![0, 1, 2]]);
-            map.insert((1, 2), vec![vec![1, 2]]);
+            map.insert((0, 4), vec![vec![0, 4], vec![0, 5, 4]]);
+            map.insert((1, 2), vec![vec![1, 0, 4, 2]]);
             Env(map)
         }
         pub fn get_route(&self, src: usize, dst: usize, i: usize) -> *const Route {
@@ -156,7 +171,7 @@ mod test {
             TSNFlow {
                 id: 0.into(),
                 src: 0,
-                dst: 2,
+                dst: 4,
                 size: 100,
                 period: 100,
                 max_delay: 100,
@@ -165,7 +180,7 @@ mod test {
             TSNFlow {
                 id: 0.into(),
                 src: 0,
-                dst: 2,
+                dst: 4,
                 size: 100,
                 period: 150,
                 max_delay: 150,
@@ -191,9 +206,9 @@ mod test {
 
         wrapper.flow_table.update_info(1.into(), 1);
 
-        assert_eq!(&vec![0, 2], wrapper.get_route(0.into()));
-        assert_eq!(&vec![0, 1, 2], wrapper.get_route(1.into()));
-        assert_eq!(&vec![1, 2], wrapper.get_route(2.into()));
+        assert_eq!(&vec![0, 4], wrapper.get_route(0.into()));
+        assert_eq!(&vec![0, 5, 4], wrapper.get_route(1.into()));
+        assert_eq!(&vec![1, 0, 4, 2], wrapper.get_route(2.into()));
         let old_new = wrapper
             .old_new_table
             .as_ref()
@@ -203,9 +218,9 @@ mod test {
         assert_eq!(&OldNew::New, old_new);
 
         wrapper.insert(flows.clone(), vec![], 0);
-        assert_eq!(&vec![0, 2], wrapper.get_route(3.into()));
-        assert_eq!(&vec![0, 2], wrapper.get_route(4.into()));
-        assert_eq!(&vec![1, 2], wrapper.get_route(5.into()));
+        assert_eq!(&vec![0, 4], wrapper.get_route(3.into()));
+        assert_eq!(&vec![0, 4], wrapper.get_route(4.into()));
+        assert_eq!(&vec![1, 0, 4, 2], wrapper.get_route(5.into()));
         let old_new = wrapper
             .old_new_table
             .as_ref()

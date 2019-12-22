@@ -1,8 +1,15 @@
 pub mod prelude;
 
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum OldNew<T: Clone + Eq> {
+    New(T),
+    Old(T),
+}
+
 mod iter {
+    use super::OldNew;
     use crate::flow::{FlowEnum, FlowID};
-    pub enum Iter<'a, F: From<&'a FlowEnum>, T: Clone> {
+    pub enum Iter<'a, F: From<&'a FlowEnum>, T: Clone + Eq> {
         FlowTable {
             ptr: usize,
             cur_list: usize,
@@ -16,12 +23,12 @@ mod iter {
             cur_list: usize,
             id_lists: Vec<&'a Vec<FlowID>>,
             flow_list: &'a Vec<Option<FlowEnum>>,
-            infos: &'a Vec<Option<T>>,
+            infos: &'a Vec<Option<OldNew<T>>>,
             _marker: std::marker::PhantomData<&'a F>,
         },
     }
 
-    impl<'a, F: From<&'a FlowEnum>, T: Clone> Iterator for Iter<'a, F, T> {
+    impl<'a, F: From<&'a FlowEnum>, T: Clone + Eq> Iterator for Iter<'a, F, T> {
         type Item = (F, &'a T);
         fn next(&mut self) -> Option<(F, &'a T)> {
             match self {
@@ -60,7 +67,11 @@ mod iter {
                             let id = id_list[*ptr];
                             *ptr += 1;
                             let flow = flow_list[id.0].as_ref().unwrap();
-                            return Some((flow.into(), infos[id.0].as_ref().unwrap()));
+                            if let Some(OldNew::New(info)) = infos[id.0].as_ref() {
+                                return Some((flow.into(), info));
+                            } else {
+                                panic!("不知為何遍歷到沒東西的地方");
+                            }
                         }
                         *cur_list += 1;
                     }
@@ -70,11 +81,11 @@ mod iter {
         }
     }
 
-    pub struct IterMut<'a, F: From<&'a FlowEnum>, T: Clone> {
+    pub struct IterMut<'a, F: From<&'a FlowEnum>, T: Clone + Eq> {
         pub(super) iter: Iter<'a, F, T>,
     }
 
-    impl<'a, F: From<&'a FlowEnum>, T: Clone> Iterator for IterMut<'a, F, T> {
+    impl<'a, F: From<&'a FlowEnum>, T: Clone + Eq> Iterator for IterMut<'a, F, T> {
         type Item = (F, &'a mut T);
         fn next(&mut self) -> Option<(F, &'a mut T)> {
             self.iter

@@ -5,14 +5,14 @@ use std::hash::Hash;
 use super::MyMinHeap;
 use crate::graph_util::Graph;
 
-pub struct Dijkstra<'a, K: Hash + Eq + Copy, G: Graph<K>> {
-    g: &'a G,
+pub struct Dijkstra<K: Hash + Eq + Copy, G: Graph<K>> {
+    pub(super) g: G,
     final_dist_map: HashMap<(K, K), (f64, Cell<K>)>,
     routed_node_table: HashMap<K, bool>,
 }
 
-impl<'a, K: Hash + Eq + Copy, G: Graph<K>> Dijkstra<'a, K, G> {
-    pub fn new(g: &'a G) -> Self {
+impl<K: Hash + Eq + Copy, G: Graph<K>> Dijkstra<K, G> {
+    pub fn new(g: G) -> Self {
         return Dijkstra {
             g,
             final_dist_map: HashMap::new(),
@@ -83,7 +83,7 @@ mod test {
         g.add_edge((0, 1), 10.0)?;
         g.add_edge((1, 2), 20.0)?;
         g.add_edge((0, 2), 2.0)?;
-        let mut algo = Dijkstra::new(&g);
+        let mut algo = Dijkstra::new(g);
         assert_eq!(vec![0, 1, 2], algo.get_route(0, 2).unwrap().1);
         Ok(())
     }
@@ -98,14 +98,13 @@ mod test {
         g.add_edge((0, 3), 3.0)?;
         g.add_edge((3, 4), 3.0)?;
 
-        let mut algo = Dijkstra::new(&g);
+        let mut algo = Dijkstra::new(g.clone());
         assert_eq!(vec![0, 1, 3, 4], algo.get_route(0, 4).unwrap().1);
         assert_eq!(vec![2, 1, 3, 4], algo.get_route(2, 4).unwrap().1);
         assert!(algo.get_route(0, 5).is_none());
 
-        let mut g = g.clone();
         g.add_edge((4, 5), 2.0)?;
-        let mut algo = Dijkstra::new(&g);
+        let mut algo = Dijkstra::new(g);
         assert_eq!(vec![0, 1, 3, 4, 5], algo.get_route(0, 5).unwrap().1);
         Ok(())
     }

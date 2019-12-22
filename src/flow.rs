@@ -58,6 +58,7 @@ pub struct Flow<T: Clone> {
 pub type TSNFlow = Flow<data::TSNData>;
 pub type AVBFlow = Flow<data::AVBData>;
 
+#[derive(Clone, Debug)]
 pub enum FlowEnum {
     TSN(TSNFlow),
     AVB(AVBFlow),

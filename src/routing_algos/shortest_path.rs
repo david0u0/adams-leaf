@@ -8,15 +8,15 @@ use crate::recorder::{flow_table::prelude::*, GCL};
 use crate::util::Dijkstra;
 use crate::{W1, W2, W3};
 
-pub struct SPF<'a> {
+pub struct SPF {
     g: MemorizingGraph,
     flow_table: FlowTable<Vec<usize>>,
     gcl: GCL,
-    dijkstra_algo: Dijkstra<'a, usize, StreamAwareGraph>,
+    dijkstra_algo: Dijkstra<usize, StreamAwareGraph>,
 }
 
-impl<'a> SPF<'a> {
-    pub fn new(g: &'a StreamAwareGraph) -> Self {
+impl SPF {
+    pub fn new(g: StreamAwareGraph) -> Self {
         return SPF {
             g: MemorizingGraph::new(g.clone()),
             gcl: GCL::new(1, g.get_edge_cnt()),
@@ -26,7 +26,7 @@ impl<'a> SPF<'a> {
     }
 }
 
-impl<'a> RoutingAlgo for SPF<'a> {
+impl RoutingAlgo for SPF {
     fn get_last_compute_time(&self) -> u128 {
         unimplemented!();
     }
@@ -38,7 +38,7 @@ impl<'a> RoutingAlgo for SPF<'a> {
         }
         for (flow, _) in self.flow_table.iter_tsn() {
             let r = self.get_shortest_route(flow);
-            tt_changed.update_info(flow.id, r);
+            tt_changed.update_info_force(flow.id, r);
         }
 
         // TT schedule
@@ -91,7 +91,7 @@ impl<'a> RoutingAlgo for SPF<'a> {
         println!("total avb cost = {}", self.compute_all_avb_cost());
     }
 }
-impl<'a> SPF<'a> {
+impl SPF {
     fn get_shortest_route<T: Clone>(&self, flow: &Flow<T>) -> Vec<usize> {
         let _dij = &self.dijkstra_algo as *const Dijkstra<usize, StreamAwareGraph>
             as *mut Dijkstra<usize, StreamAwareGraph>;

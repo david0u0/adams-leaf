@@ -15,7 +15,7 @@ const MAX_BE_SIZE: f64 = 1500.0;
 /// * `flow_table` - 資料流表。需注意的是，這裡僅用了資料流本身的資料，而未使用其隨附資訊
 /// TODO: 改用 FlowArena?
 /// * `gcl` - 所有 TT 資料流的 Gate Control List
-pub fn compute_avb_latency<T: Clone>(
+pub fn compute_avb_latency<T: Clone + Eq>(
     g: &MemorizingGraph,
     flow: &AVBFlow,
     route: &Vec<usize>,
@@ -30,7 +30,7 @@ pub fn compute_avb_latency<T: Clone>(
     }
     end_to_end_lanency as u32
 }
-fn wcd_on_single_link<T: Clone>(
+fn wcd_on_single_link<T: Clone + Eq>(
     flow: &AVBFlow,
     bandwidth: f64,
     flow_table: &FlowTable<T>,
