@@ -98,6 +98,7 @@ pub trait IFlowTable {
     }
     fn iter_avb<'a>(&'a self) -> Iter<'a, &'a AVBFlow, Self::INFO>;
     fn iter_tsn<'a>(&'a self) -> Iter<'a, &'a TSNFlow, Self::INFO>;
+    fn iter<'a>(&'a self) -> Iter<'a, &'a FlowEnum, Self::INFO>;
     fn iter_avb_mut<'a>(&'a mut self) -> IterMut<'a, &'a AVBFlow, Self::INFO> {
         IterMut {
             iter: self.iter_avb(),
@@ -147,16 +148,16 @@ impl<T: Clone> FlowTable<T> {
             infos,
         }
     }
-    pub fn apply_diff(&mut self, is_avb: bool, other: &DiffFlowTable<T>) {
+    pub fn apply_diff(&mut self, is_tsn: bool, other: &DiffFlowTable<T>) {
         if !self.is_same_flow_list(other) {
             panic!("試圖合併不相干的資料流表");
         }
-        if is_avb {
-            for (flow, info) in other.iter_avb() {
+        if is_tsn {
+            for (flow, info) in other.iter_tsn() {
                 self.update_info(flow.id, info.clone());
             }
         } else {
-            for (flow, info) in other.iter_tsn() {
+            for (flow, info) in other.iter_avb() {
                 self.update_info(flow.id, info.clone());
             }
         }
@@ -216,7 +217,8 @@ impl<T: Clone> IFlowTable for FlowTable<T> {
     fn iter_avb<'a>(&'a self) -> Iter<'a, &'a AVBFlow, T> {
         Iter::FlowTable {
             ptr: 0,
-            id_list: &self.arena.avbs,
+            cur_list: 0,
+            id_lists: vec![&self.arena.avbs],
             flow_list: &self.arena.flow_list,
             infos: &self.infos,
             _marker: std::marker::PhantomData,
@@ -225,7 +227,18 @@ impl<T: Clone> IFlowTable for FlowTable<T> {
     fn iter_tsn<'a>(&'a self) -> Iter<'a, &'a TSNFlow, T> {
         Iter::FlowTable {
             ptr: 0,
-            id_list: &self.arena.tsns,
+            cur_list: 0,
+            id_lists: vec![&self.arena.tsns],
+            flow_list: &self.arena.flow_list,
+            infos: &self.infos,
+            _marker: std::marker::PhantomData,
+        }
+    }
+    fn iter<'a>(&'a self) -> Iter<'a, &'a FlowEnum, T> {
+        Iter::FlowTable {
+            ptr: 0,
+            cur_list: 0,
+            id_lists: vec![&self.arena.tsns, &self.arena.avbs],
             flow_list: &self.arena.flow_list,
             infos: &self.infos,
             _marker: std::marker::PhantomData,
@@ -285,7 +298,8 @@ impl<T: Clone> IFlowTable for DiffFlowTable<T> {
     fn iter_avb<'a>(&'a self) -> Iter<'a, &'a AVBFlow, T> {
         Iter::DiffTable {
             ptr: 0,
-            id_list: &self.avb_diff,
+            cur_list: 0,
+            id_lists: vec![&self.avb_diff],
             flow_list: &self.get_inner_arena().flow_list,
             infos: &self.table.infos,
             _marker: std::marker::PhantomData,
@@ -294,7 +308,18 @@ impl<T: Clone> IFlowTable for DiffFlowTable<T> {
     fn iter_tsn<'a>(&'a self) -> Iter<'a, &'a TSNFlow, T> {
         Iter::DiffTable {
             ptr: 0,
-            id_list: &self.tsn_diff,
+            cur_list: 0,
+            id_lists: vec![&self.tsn_diff],
+            flow_list: &self.get_inner_arena().flow_list,
+            infos: &self.table.infos,
+            _marker: std::marker::PhantomData,
+        }
+    }
+    fn iter<'a>(&'a self) -> Iter<'a, &'a FlowEnum, T> {
+        Iter::DiffTable {
+            ptr: 0,
+            cur_list: 0,
+            id_lists: vec![&self.tsn_diff, &self.avb_diff],
             flow_list: &self.get_inner_arena().flow_list,
             infos: &self.table.infos,
             _marker: std::marker::PhantomData,
@@ -355,7 +380,13 @@ mod test {
         assert_eq!(table.get_info(2.into()), Some(&0));
         assert_eq!(table.get_info(4.into()), Some(&0));
 
-        table.apply_diff(true, &changed);
+        // 改動一筆 TSN 資料流的隨附資訊
+        changed.update_info(0.into(), 66);
+        assert_eq!(changed.get_flow_cnt(), 3);
+        assert_eq!(changed.get_info(0.into()), Some(&66));
+
+        // 由於只合併 AVB 的部份，識別碼=0的資料流應不受影響
+        table.apply_diff(false, &changed);
         assert_eq!(table.get_info(0.into()), Some(&0));
         assert_eq!(table.get_info(2.into()), Some(&99));
         assert_eq!(table.get_info(4.into()), Some(&77));

@@ -20,6 +20,7 @@ pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128, reconf: DiffFlowTable<usize
         }
     });
 
+    // FIXME: update_avb_on_graph
     for (flow, &route_k) in algo.flow_table.iter_avb() {
         unsafe {
             algo.update_flowid_on_route(true, flow, route_k);

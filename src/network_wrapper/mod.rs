@@ -1,34 +1,43 @@
 use crate::flow::{AVBFlow, FlowEnum, FlowID, TSNFlow};
 use crate::graph_util::{Graph, StreamAwareGraph};
 use crate::recorder::{flow_table::prelude::*, GCL};
+use crate::routing_algos::time_and_tide::{compute_avb_latency, schedule_online};
+use std::rc::Rc;
+
+mod cost;
+use cost::Calculator;
+pub use cost::RoutingCost;
+mod old_new_table;
+use old_new_table::{OldNew, OldNewTable};
 
 type Route = Vec<usize>;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(self) enum OldNew<T: Clone + Eq> {
-    Old(T),
-    New,
-}
-
-pub struct NetworkWrapper<T: Clone + Eq, F: Fn(usize, usize, &T) -> *const Route> {
+/// 這個結構預期會被複製很多次，因此其中的每個元件都應儘可能想辦法降低複製成本
+#[derive(Clone)]
+pub struct NetworkWrapper<T: Clone + Eq> {
     flow_table: FlowTable<T>,
-    old_new_table: Option<FlowTable<OldNew<T>>>,
-    get_route_func: F,
+    old_new_table: Option<Rc::<OldNewTable<T>>>, // 在每次運算中類似常數，故用 RC 來包
+    get_route_func: Rc<dyn Fn(&FlowEnum, &T) -> *const Route>,
     gcl: GCL,
     graph: StreamAwareGraph,
+    tsn_fail: bool,
 }
 
-impl<T: Clone + Eq, F: Fn(usize, usize, &T) -> *const Route> NetworkWrapper<T, F> {
-    pub fn new(graph: StreamAwareGraph, get_route_func: F) -> Self {
+impl<T: Clone + Eq> NetworkWrapper<T> {
+    pub fn new<F>(graph: StreamAwareGraph, get_route_func: F) -> Self
+    where
+        F: 'static + Fn(&FlowEnum, &T) -> *const Route,
+    {
         NetworkWrapper {
             flow_table: FlowTable::new(),
             old_new_table: None,
             gcl: GCL::new(1, graph.get_edge_cnt()),
+            tsn_fail: false,
             graph,
-            get_route_func,
+            get_route_func: Rc::new(get_route_func),
         }
     }
-    /// 插入新的資料流，同時會捨棄先前的新舊表，並
+    /// 插入新的資料流，同時會捨棄先前的新舊表，並創建另一份新舊表
     pub fn insert(
         &mut self,
         tsns: Vec<TSNFlow>,
@@ -52,21 +61,67 @@ impl<T: Clone + Eq, F: Fn(usize, usize, &T) -> *const Route> NetworkWrapper<T, F
                 OldNew::Old(t.clone())
             }
         });
-        self.old_new_table = Some(old_new_table);
+        self.old_new_table = Some(Rc::new(old_new_table));
 
         reconf
     }
     pub fn get_route(&self, flow_id: FlowID) -> &Route {
         let flow_enum = self.flow_table.get(flow_id).unwrap();
         let info = self.flow_table.get_info(flow_id).unwrap();
-        let route = {
-            match flow_enum {
-                // TODO: rust 難道沒有更好的寫法嗎？
-                FlowEnum::AVB(flow) => (self.get_route_func)(flow.src, flow.dst, info),
-                FlowEnum::TSN(flow) => (self.get_route_func)(flow.src, flow.dst, info),
-            }
-        };
+        let route = (self.get_route_func)(flow_enum, info);
         unsafe { &*route }
+    }
+    /// 更新 AVB 資料流表與圖上資訊
+    pub fn update_avb(&mut self, diff: &DiffFlowTable<T>) {
+        for (flow, info) in diff.iter_avb() {
+            // NOTE: 因為 self.graph 與 self.get_route 是平行所有權
+            let graph = unsafe { &mut (*(self as *mut Self)).graph };
+            let og_route = self.get_route(flow.id);
+            graph.update_flowid_on_route(false, flow.id, og_route);
+            self.flow_table.update_info(flow.id, info.clone());
+            let new_route = self.get_route(flow.id);
+            graph.update_flowid_on_route(false, flow.id, new_route);
+        }
+    }
+    /// 更新 TSN 資料流表與 GCL
+    pub fn update_tsn(&mut self, diff: &DiffFlowTable<T>) {
+        // NOTE: 在 schedule_online 函式中就會更新資料流表（這當然是個不太好的實作……）
+        //       因此在這裡就不用執行 self.flow_table.update_info()
+        for (flow, _) in diff.iter_tsn() {
+            // NOTE: 拔除 GCL
+            let route = self.get_route(flow.id);
+            let links: Vec<usize> = self
+                .graph
+                .get_links_id_bandwidth(route)
+                .iter()
+                .map(|(id, _)| *id)
+                .collect();
+            self.gcl.delete_flow(&links, flow.id);
+        }
+        let _self = self as *const Self;
+        let result = schedule_online(&mut self.flow_table, diff, &mut self.gcl, |cur_flow, k| {
+            // NOTE: 因為 self.flow_table.get 和 self.get_route_func 和 self.graph 與其它部份是平行所有權
+            unsafe {
+                let flow = (*_self).flow_table.get(cur_flow.id).unwrap();
+                let route = &*(((*_self).get_route_func)(&flow, k));
+                (*_self).graph.get_links_id_bandwidth(route)
+            }
+        });
+        if result.is_err() {
+            self.tsn_fail = true;
+        } else {
+            // TODO: 應該如何處理 result = Ok(bool) ？
+            self.tsn_fail = false;
+        }
+    }
+    pub fn get_flow_table(&self) -> &FlowTable<T> {
+        &self.flow_table
+    }
+    pub fn compute_avb_wcd(&self, flow: &AVBFlow) -> u32 {
+        self._compute_avb_wcd(flow)
+    }
+    pub fn compute_all_cost(&self) -> RoutingCost {
+        self._compute_all_cost()
     }
 }
 
@@ -90,12 +145,12 @@ mod test {
         }
     }
 
-    #[test]
-    fn test_insert_get_route() {
+    fn init() -> (NetworkWrapper<usize>, Vec<TSNFlow>) {
         let graph = read_topo_from_file("test_graph.json");
         let env = Env::new();
-        let mut wrapper = NetworkWrapper::new(graph, move |src: usize, dst: usize, k: &usize| {
-            env.get_route(src, dst, *k)
+        let wrapper = NetworkWrapper::new(graph, move |flow, k: &usize| match flow {
+            FlowEnum::AVB(flow) => env.get_route(flow.src, flow.dst, *k),
+            FlowEnum::TSN(flow) => env.get_route(flow.src, flow.dst, *k),
         });
         let flows = vec![
             TSNFlow {
@@ -126,6 +181,12 @@ mod test {
                 spec_data: TSNData { offset: 0 },
             },
         ];
+        (wrapper, flows)
+    }
+
+    #[test]
+    fn test_insert_get_route() {
+        let (mut wrapper, flows) = init();
         wrapper.insert(flows.clone(), vec![], 0);
 
         wrapper.flow_table.update_info(1.into(), 1);
@@ -159,7 +220,22 @@ mod test {
             .get_info(3.into())
             .unwrap();
         assert_eq!(&OldNew::New, old_new);
-
-        // wrapper.flow_table.insert(flows, vec![], 0); // 反註解這行會導致執行期錯誤
+    }
+    #[test]
+    #[should_panic]
+    fn test_clone_and_insert_should_panic() {
+        let (mut wrapper, flows) = init();
+        wrapper.insert(flows.clone(), vec![], 0);
+        let mut wrapper2 = wrapper.clone();
+        wrapper2.insert(flows.clone(), vec![], 0);
+    }
+    #[test]
+    fn test_clone() {
+        let (mut wrapper, flows) = init();
+        wrapper.insert(flows.clone(), vec![], 0);
+        let wrapper2 = wrapper.clone();
+        wrapper.flow_table.update_info(0.into(), 99);
+        assert_eq!(&99, wrapper.flow_table.get_info(0.into()).unwrap());
+        assert_eq!(&0, wrapper2.flow_table.get_info(0.into()).unwrap());
     }
 }
