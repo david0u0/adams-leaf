@@ -24,23 +24,25 @@ fn main() -> Result<(), String> {
     // FIXME 對這個圖作 Yens algo，0->2這條路有時找得到6條，有時只找得到5條
 
     if algo_type == "aco" {
-        println!("=== rount 1 ===");
-        let mut algo = AdamsAnt::new(&g, None, None);
+        println!("=== round 1 ===");
+        let mut algo = AdamsAnt::new(g);
         algo.add_flows_in_time(tsns1.clone(), avbs1.clone(), 1000 * 300);
-        println!("=== rount 2 ===");
+        algo.show_results();
+        println!("=== round 2 ===");
         algo.add_flows(tsns2.clone(), avbs2.clone());
         algo.show_results();
         println!("compute time = {} micro sec", algo.get_last_compute_time());
     } else if algo_type == "ro" {
-        println!("=== rount 1 ===");
-        let mut algo = RO::new(&g, None, None);
+        println!("=== round 1 ===");
+        let mut algo = RO::new(g);
         algo.add_flows(tsns1.clone(), avbs1.clone());
-        println!("=== rount 2 ===");
+        algo.show_results();
+        println!("=== round 2 ===");
         algo.add_flows(tsns2.clone(), avbs2.clone());
         algo.show_results();
         println!("compute time = {} micro sec", algo.get_last_compute_time());
     } else if algo_type == "spf" {
-        let mut algo = SPF::new(&g);
+        let mut algo = SPF::new(g);
         algo.add_flows(tsns1.clone(), avbs1.clone());
         algo.add_flows(tsns2.clone(), avbs2.clone());
         algo.show_results();

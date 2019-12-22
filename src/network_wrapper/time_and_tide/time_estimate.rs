@@ -1,6 +1,6 @@
-use super::super::{flow, flow_table_prelude::*, AVBFlow, GCL};
-use crate::graph_util::StreamAwareGraph;
-use flow::{AVBClass, FlowID};
+use crate::flow::{AVBFlow, FlowID};
+use crate::graph_util::MemorizingGraph;
+use crate::recorder::{flow_table::prelude::*, GCL};
 
 /// AVB 資料流最多可以佔用的資源百分比（模擬 Credit Base Shaper 的效果）
 const MAX_AVB_SETTING: f64 = 0.75;
@@ -8,12 +8,14 @@ const MAX_AVB_SETTING: f64 = 0.75;
 const MAX_BE_SIZE: f64 = 1500.0;
 
 /// 計算 AVB 資料流的端對端延遲（包含 TT、BE 及其它 AVB 所造成的延遲）
-/// * `g` - 全局的網路拓撲
+/// * `g` - 全局網路拓撲，每條邊上記錄其承載哪些資料流
 /// * `flow` - 該 AVB 資料流的詳細資訊
 /// * `route` - 該 AVB 資料流的路徑
+/// * `flow_table` - 資料流表。需注意的是，這裡僅用了資料流本身的資料，而未使用其隨附資訊
+/// TODO: 改用 FlowArena?
 /// * `gcl` - 所有 TT 資料流的 Gate Control List
-pub fn compute_avb_latency<T: Clone>(
-    g: &StreamAwareGraph,
+pub fn compute_avb_latency<T: Clone + Eq>(
+    g: &MemorizingGraph,
     flow: &AVBFlow,
     route: &Vec<usize>,
     flow_table: &FlowTable<T>,
@@ -22,22 +24,13 @@ pub fn compute_avb_latency<T: Clone>(
     let overlap_flow_id = g.get_overlap_flows(route);
     let mut end_to_end_lanency = 0.0;
     for (i, (link_id, bandwidth)) in g.get_links_id_bandwidth(route).into_iter().enumerate() {
-        let wcd = wcd_on_single_link(
-            flow.id,
-            flow.size,
-            flow.spec_data.avb_class,
-            bandwidth,
-            flow_table,
-            &overlap_flow_id[i],
-        );
+        let wcd = wcd_on_single_link(flow, bandwidth, flow_table, &overlap_flow_id[i]);
         end_to_end_lanency += wcd + tt_interfere_avb_single_link(link_id, wcd as f64, gcl) as f64;
     }
     end_to_end_lanency as u32
 }
-fn wcd_on_single_link<T: Clone>(
-    id: FlowID,
-    size: usize,
-    self_type: AVBClass,
+fn wcd_on_single_link<T: Clone + Eq>(
+    flow: &AVBFlow,
     bandwidth: f64,
     flow_table: &FlowTable<T>,
     overlap_flow_id: &Vec<FlowID>,
@@ -48,13 +41,16 @@ fn wcd_on_single_link<T: Clone>(
     // AVB 資料流最多只能佔用這樣的頻寬
     let bandwidth = MAX_AVB_SETTING * bandwidth;
     // On link
-    wcd += size as f64 / bandwidth;
+    wcd += flow.size as f64 / bandwidth;
     // Ohter AVB
-    for &flow_id in overlap_flow_id.iter() {
-        if flow_id != id {
-            let flow = flow_table.get_avb(flow_id).unwrap();
-            if self_type.is_class_b() || flow.spec_data.avb_class.is_class_a() {
-                wcd += flow.size as f64 / bandwidth;
+    for &other_flow_id in overlap_flow_id.iter() {
+        if other_flow_id != flow.id {
+            let other_flow = flow_table.get_avb(other_flow_id).unwrap();
+            // 自己是 B 類或別人是 A 類，就有機會要等……換句話說，只有自己是 A 而別人是 B 不用等
+            let self_type = flow.spec_data.avb_class;
+            let other_type = other_flow.spec_data.avb_class;
+            if self_type.is_class_b() || other_type.is_class_a() {
+                wcd += other_flow.size as f64 / bandwidth;
             }
         }
     }
@@ -83,10 +79,11 @@ fn tt_interfere_avb_single_link(link_id: usize, wcd: f64, gcl: &GCL) -> u32 {
 
 #[cfg(test)]
 mod test {
-    use super::super::super::flow::AVBData;
     use super::*;
     use crate::graph_util::*;
-    fn init_settings() -> (StreamAwareGraph, Vec<AVBFlow>, FlowTable<usize>, GCL) {
+
+    fn init_settings() -> (MemorizingGraph, Vec<AVBFlow>, FlowTable<usize>, GCL) {
+        use crate::flow::data::{AVBClass, AVBData};
         let mut g = StreamAwareGraph::new();
         g.add_host(Some(3));
         g.add_edge((0, 1), 100.0).unwrap();
@@ -128,7 +125,7 @@ mod test {
         ];
         let flow_table = FlowTable::new();
         let gcl = GCL::new(10, g.get_edge_cnt());
-        (g, flows, flow_table, gcl)
+        (MemorizingGraph::new(g), flows, flow_table, gcl)
     }
     fn build_flowid_vec(v: Vec<usize>) -> Vec<FlowID> {
         v.into_iter().map(|i| i.into()).collect()
@@ -136,16 +133,12 @@ mod test {
     #[test]
     fn test_single_link_avb() {
         let (_, flows, mut route_table, _) = init_settings();
-        let class_a = AVBClass::A;
-        let class_b = AVBClass::B;
 
         route_table.insert(vec![], flows, 0);
 
         assert_eq!(
             wcd_on_single_link(
-                0.into(),
-                75,
-                class_a,
+                route_table.get_avb(0.into()).unwrap(),
                 100.0,
                 &route_table,
                 &build_flowid_vec(vec![0, 2])
@@ -154,9 +147,7 @@ mod test {
         );
         assert_eq!(
             wcd_on_single_link(
-                0.into(),
-                75,
-                class_a,
+                route_table.get_avb(0.into()).unwrap(),
                 100.0,
                 &route_table,
                 &build_flowid_vec(vec![1, 0, 2])
@@ -165,9 +156,7 @@ mod test {
         );
         assert_eq!(
             wcd_on_single_link(
-                1.into(),
-                150,
-                class_a,
+                route_table.get_avb(1.into()).unwrap(),
                 100.0,
                 &route_table,
                 &build_flowid_vec(vec![1, 0, 2])
@@ -177,9 +166,7 @@ mod test {
 
         assert_eq!(
             wcd_on_single_link(
-                2.into(),
-                75,
-                class_b,
+                route_table.get_avb(2.into()).unwrap(),
                 100.0,
                 &route_table,
                 &build_flowid_vec(vec![1, 0, 2])
