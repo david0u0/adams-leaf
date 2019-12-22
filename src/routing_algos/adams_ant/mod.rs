@@ -1,6 +1,6 @@
 use super::{time_and_tide::schedule_online, RoutingAlgo};
 use crate::flow::{AVBFlow, Flow, FlowID, TSNFlow};
-use crate::graph_util::{Graph, StreamAwareGraph};
+use crate::graph_util::{Graph, MemorizingGraph, StreamAwareGraph};
 use crate::recorder::{flow_table::prelude::*, GCL};
 use crate::util::aco::ACO;
 use crate::util::YensAlgo;
@@ -25,7 +25,7 @@ const K: usize = 20;
 
 pub struct AdamsAnt<'a> {
     aco: ACO,
-    g: StreamAwareGraph,
+    g: MemorizingGraph,
     flow_table: FT,
     yens_algo: YensAlgo<'a, usize, StreamAwareGraph>,
     gcl: GCL,
@@ -39,7 +39,7 @@ impl<'a> AdamsAnt<'a> {
             gcl,
             flow_table,
             aco: ACO::new(0, K, None),
-            g: g.clone(),
+            g: MemorizingGraph::new(g.clone()),
             yens_algo: YensAlgo::new(g, K),
             compute_time: 0,
         }
@@ -66,7 +66,7 @@ impl<'a> AdamsAnt<'a> {
         }
     }
     unsafe fn update_flowid_on_route(&self, remember: bool, flow: &AVBFlow, k: usize) {
-        let _g = &self.g as *const StreamAwareGraph as *mut StreamAwareGraph;
+        let _g = &self.g as *const MemorizingGraph as *mut MemorizingGraph;
         let route = self.get_kth_route(flow, k);
         (*_g).update_flowid_on_route(remember, flow.id, route);
     }

@@ -3,13 +3,13 @@ use super::{
     RoutingAlgo,
 };
 use crate::flow::{AVBFlow, Flow, FlowID, TSNFlow};
-use crate::graph_util::{Graph, StreamAwareGraph};
+use crate::graph_util::{Graph, MemorizingGraph, StreamAwareGraph};
 use crate::recorder::{flow_table::prelude::*, GCL};
 use crate::util::Dijkstra;
 use crate::{W1, W2, W3};
 
 pub struct SPF<'a> {
-    g: StreamAwareGraph,
+    g: MemorizingGraph,
     flow_table: FlowTable<Vec<usize>>,
     gcl: GCL,
     dijkstra_algo: Dijkstra<'a, usize, StreamAwareGraph>,
@@ -18,7 +18,7 @@ pub struct SPF<'a> {
 impl<'a> SPF<'a> {
     pub fn new(g: &'a StreamAwareGraph) -> Self {
         return SPF {
-            g: g.clone(),
+            g: MemorizingGraph::new(g.clone()),
             gcl: GCL::new(1, g.get_edge_cnt()),
             flow_table: FlowTable::new(),
             dijkstra_algo: Dijkstra::new(g),
@@ -56,7 +56,7 @@ impl<'a> RoutingAlgo for SPF<'a> {
             .unwrap();
         }
 
-        let _g = &mut self.g as *mut StreamAwareGraph;
+        let _g = &mut self.g as *mut MemorizingGraph;
         for (flow, r) in self.flow_table.iter_avb() {
             let r = self.get_shortest_route(flow);
             unsafe {

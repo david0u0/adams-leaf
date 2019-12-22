@@ -1,6 +1,6 @@
 use crate::flow::AVBFlow;
 use crate::flow::FlowID;
-use crate::graph_util::StreamAwareGraph;
+use crate::graph_util::MemorizingGraph;
 use crate::recorder::{flow_table::prelude::*, GCL};
 
 /// AVB 資料流最多可以佔用的資源百分比（模擬 Credit Base Shaper 的效果）
@@ -16,7 +16,7 @@ const MAX_BE_SIZE: f64 = 1500.0;
 /// TODO: 改用 FlowArena?
 /// * `gcl` - 所有 TT 資料流的 Gate Control List
 pub fn compute_avb_latency<T: Clone>(
-    g: &StreamAwareGraph,
+    g: &MemorizingGraph,
     flow: &AVBFlow,
     route: &Vec<usize>,
     flow_table: &FlowTable<T>,
@@ -83,7 +83,7 @@ mod test {
     use super::*;
     use crate::graph_util::*;
 
-    fn init_settings() -> (StreamAwareGraph, Vec<AVBFlow>, FlowTable<usize>, GCL) {
+    fn init_settings() -> (MemorizingGraph, Vec<AVBFlow>, FlowTable<usize>, GCL) {
         use crate::flow::data::{AVBClass, AVBData};
         let mut g = StreamAwareGraph::new();
         g.add_host(Some(3));
@@ -126,7 +126,7 @@ mod test {
         ];
         let flow_table = FlowTable::new();
         let gcl = GCL::new(10, g.get_edge_cnt());
-        (g, flows, flow_table, gcl)
+        (MemorizingGraph::new(g), flows, flow_table, gcl)
     }
     fn build_flowid_vec(v: Vec<usize>) -> Vec<FlowID> {
         v.into_iter().map(|i| i.into()).collect()

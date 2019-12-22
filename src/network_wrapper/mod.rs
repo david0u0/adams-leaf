@@ -1,5 +1,5 @@
 use crate::flow::{AVBFlow, FlowEnum, FlowID, TSNFlow};
-use crate::graph_util::{Graph, StreamAwareGraph};
+use crate::graph_util::{Graph, MemorizingGraph, StreamAwareGraph};
 use crate::recorder::{flow_table::prelude::*, GCL};
 use crate::routing_algos::time_and_tide::{compute_avb_latency, schedule_online};
 use std::rc::Rc;
@@ -16,10 +16,10 @@ type Route = Vec<usize>;
 #[derive(Clone)]
 pub struct NetworkWrapper<T: Clone + Eq> {
     flow_table: FlowTable<T>,
-    old_new_table: Option<Rc::<OldNewTable<T>>>, // 在每次運算中類似常數，故用 RC 來包
+    old_new_table: Option<Rc<OldNewTable<T>>>, // 在每次運算中類似常數，故用 RC 來包
     get_route_func: Rc<dyn Fn(&FlowEnum, &T) -> *const Route>,
     gcl: GCL,
-    graph: StreamAwareGraph,
+    graph: MemorizingGraph,
     tsn_fail: bool,
 }
 
@@ -33,7 +33,7 @@ impl<T: Clone + Eq> NetworkWrapper<T> {
             old_new_table: None,
             gcl: GCL::new(1, graph.get_edge_cnt()),
             tsn_fail: false,
-            graph,
+            graph: MemorizingGraph::new(graph),
             get_route_func: Rc::new(get_route_func),
         }
     }

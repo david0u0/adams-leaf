@@ -3,7 +3,7 @@ use super::{
     RoutingAlgo,
 };
 use crate::flow::{AVBFlow, Flow, FlowID, TSNFlow};
-use crate::graph_util::{Graph, StreamAwareGraph};
+use crate::graph_util::{Graph, MemorizingGraph, StreamAwareGraph};
 use crate::recorder::{flow_table::prelude::*, GCL};
 use crate::util::YensAlgo;
 use crate::{FAST_STOP, W1, W2, W3};
@@ -27,7 +27,7 @@ fn gen_n_distinct_outof_k(n: usize, k: usize) -> Vec<usize> {
 }
 
 pub struct RO<'a> {
-    g: StreamAwareGraph,
+    g: MemorizingGraph,
     flow_table: FT,
     yens_algo: YensAlgo<'a, usize, StreamAwareGraph>,
     gcl: GCL,
@@ -39,7 +39,7 @@ impl<'a> RO<'a> {
         let flow_table = flow_table.unwrap_or(FlowTable::new());
         let gcl = gcl.unwrap_or(GCL::new(1, g.get_edge_cnt()));
         RO {
-            g: g.clone(),
+            g: MemorizingGraph::new(g.clone()),
             yens_algo: YensAlgo::new(g, MAX_K),
             gcl,
             flow_table,
@@ -208,7 +208,7 @@ impl<'a> RO<'a> {
         self.yens_algo.get_route_count(flow.src, flow.dst)
     }
     unsafe fn update_flowid_on_route<T: Clone>(&self, remember: bool, flow: &Flow<T>, k: usize) {
-        let _g = &self.g as *const StreamAwareGraph as *mut StreamAwareGraph;
+        let _g = &self.g as *const MemorizingGraph as *mut MemorizingGraph;
         let route = self.get_kth_route(flow, k);
         (*_g).update_flowid_on_route(remember, flow.id, route);
     }

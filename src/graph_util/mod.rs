@@ -22,3 +22,5 @@ pub trait OnOffGraph<K: Hash + Eq>: Graph<K> {
 
 mod stream_aware_graph;
 pub use stream_aware_graph::StreamAwareGraph;
+mod memorizing_graph;
+pub use memorizing_graph::MemorizingGraph;
