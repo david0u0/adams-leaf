@@ -73,12 +73,12 @@ impl RoutingAlgo for AdamsAnt {
             let route = self.get_route(flow.id);
             let cost = self.wrapper.compute_single_avb_cost(flow);
             println!(
-                "flow id = {:?}, route = {:?} avb wcd / max latency = {:?}",
-                flow.id, route, cost.avb_wcd
+                "flow id = {:?}, route = {:?} avb wcd / max latency = {:?}, reroute = {}",
+                flow.id, route, cost.avb_wcd, cost.reroute_overhead
             );
         }
         let all_cost = self.wrapper.compute_all_cost();
-        println!("the cost structure = {:?}", all_cost,);
+        println!("the cost structure = {:?}", all_cost);
         println!("{}", all_cost.compute());
     }
     fn get_last_compute_time(&self) -> u128 {

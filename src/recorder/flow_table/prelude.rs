@@ -550,6 +550,11 @@ mod test {
         for _ in table.iter_tsn() {
             cnt += 1;
         }
+        let mut cnt2 = 0;
+        for _ in table.iter() {
+            cnt2 += 1;
+        }
+        assert_eq!(cnt, cnt2);
         cnt
     }
 }

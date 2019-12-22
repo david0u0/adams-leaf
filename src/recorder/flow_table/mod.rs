@@ -50,6 +50,7 @@ mod iter {
                                 return Some((flow.into(), infos[id.0].as_ref().unwrap()));
                             }
                         }
+                        *ptr = 0;
                         *cur_list += 1;
                     }
                 }
@@ -73,6 +74,7 @@ mod iter {
                                 panic!("不知為何遍歷到沒東西的地方");
                             }
                         }
+                        *ptr = 0;
                         *cur_list += 1;
                     }
                 }

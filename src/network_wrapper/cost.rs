@@ -16,37 +16,19 @@ pub struct RoutingCost {
 
 impl RoutingCost {
     pub fn compute(&self) -> f64 {
+        let cost = self.compute_without_reroute_cost();
+        cost + W3 * self.reroute_overhead as f64 / (self.avb_cnt + self.tsn_cnt) as f64
+    }
+    pub fn compute_without_reroute_cost(&self) -> f64 {
         let mut cost = 0.0;
         if self.tsn_schedule_fail {
             cost += W0;
         }
         cost += W1 * self.avb_fail_cnt as f64 / self.avb_cnt as f64;
         cost += W2 * self.avb_wcd / self.avb_cnt as f64;
-        cost += W3 * self.reroute_overhead as f64 / (self.avb_cnt + self.tsn_cnt) as f64;
         cost
     }
 }
-impl PartialEq for RoutingCost {
-    fn eq(&self, other: &Self) -> bool {
-        self.compute() == other.compute()
-    }
-}
-impl Eq for RoutingCost {}
-impl PartialOrd for RoutingCost {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-impl Ord for RoutingCost {
-    fn cmp(&self, other: &Self) -> Ordering {
-        if self.compute() > other.compute() {
-            Ordering::Greater
-        } else {
-            Ordering::Less
-        }
-    }
-}
-
 pub trait Calculator<T: Clone + Eq> {
     fn _compute_avb_wcd(&self, flow: &AVBFlow, route: Option<&T>) -> u32;
     fn _compute_single_avb_cost(&self, flow: &AVBFlow) -> RoutingCost;
@@ -120,7 +102,7 @@ fn is_rerouted<T: Clone + Eq>(flow: &FlowEnum, route: &T, old_new_table: &OldNew
         FlowEnum::TSN(flow) => flow.id,
     };
     if let OldNew::Old(old_route) = old_new_table.get_info(id).unwrap() {
-        !route.eq(old_route)
+        route != old_route
     } else {
         false
     }

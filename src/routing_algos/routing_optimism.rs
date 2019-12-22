@@ -68,7 +68,7 @@ impl RO {
             cur_wrapper.update_avb(&diff);
             // PHASE 2
             let cost = cur_wrapper.compute_all_cost();
-            if cost < min_cost {
+            if cost.compute_without_reroute_cost() < min_cost.compute_without_reroute_cost() {
                 min_cost = cost;
                 println!("found min_cost = {:?} at first glance!", cost);
             }
@@ -122,12 +122,6 @@ impl RO {
                 }
             };
 
-            /*let old_route = *self.flow_table.get_info(target_id).unwrap();
-            // 從圖中忘記舊路徑
-            unsafe {
-                self.update_flowid_on_route(false, target_flow, old_route);
-            }*/
-
             let new_route = self.find_min_cost_route(target_flow, None);
             let old_route = *self
                 .wrapper
@@ -143,7 +137,7 @@ impl RO {
                 cur_wrapper.compute_all_cost()
             };
 
-            if &cost < min_cost {
+            if cost.compute_without_reroute_cost() < min_cost.compute_without_reroute_cost() {
                 self.wrapper = cur_wrapper.clone();
                 *min_cost = cost.clone();
                 iter_times = 0;
@@ -206,8 +200,8 @@ impl RoutingAlgo for RO {
             let route = self.get_route(flow.id);
             let cost = self.wrapper.compute_single_avb_cost(flow);
             println!(
-                "flow id = {:?}, route = {:?} avb wcd / max latency = {:?}",
-                flow.id, route, cost.avb_wcd
+                "flow id = {:?}, route = {:?} avb wcd / max latency = {:?}, reroute = {}",
+                flow.id, route, cost.avb_wcd, cost.reroute_overhead
             );
         }
         let all_cost = self.wrapper.compute_all_cost();
