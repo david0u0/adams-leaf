@@ -80,18 +80,21 @@ impl<T: Clone + Eq> NetworkWrapper<T> {
             None
         }
     }
+    pub fn update_single_avb(&mut self, flow: &AVBFlow, info: T) {
+        // NOTE: 因為 self.graph 與 self.get_route 是平行所有權
+        let graph = unsafe { &mut (*(self as *mut Self)).graph };
+        let og_route = self.get_route(flow.id);
+        // 忘掉舊的
+        graph.update_flowid_on_route(false, flow.id, og_route);
+        self.flow_table.update_info(flow.id, info);
+        let new_route = self.get_route(flow.id);
+        // 記憶新的
+        graph.update_flowid_on_route(true, flow.id, new_route);
+    }
     /// 更新 AVB 資料流表與圖上資訊
     pub fn update_avb(&mut self, diff: &DiffFlowTable<T>) {
         for (flow, info) in diff.iter_avb() {
-            // NOTE: 因為 self.graph 與 self.get_route 是平行所有權
-            let graph = unsafe { &mut (*(self as *mut Self)).graph };
-            let og_route = self.get_route(flow.id);
-            // 忘掉舊的
-            graph.update_flowid_on_route(false, flow.id, og_route);
-            self.flow_table.update_info(flow.id, info.clone());
-            let new_route = self.get_route(flow.id);
-            // 記憶新的
-            graph.update_flowid_on_route(true, flow.id, new_route);
+            self.update_single_avb(flow, info.clone());
         }
     }
     /// 更新 TSN 資料流表與 GCL

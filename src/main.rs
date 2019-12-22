@@ -34,7 +34,7 @@ fn main() -> Result<(), String> {
         println!("compute time = {} micro sec", algo.get_last_compute_time());
     } else if algo_type == "ro" {
         println!("=== round 1 ===");
-        let mut algo = RO::new(g, None, None);
+        let mut algo = RO::new(g);
         algo.add_flows(tsns1.clone(), avbs1.clone());
         algo.show_results();
         println!("=== round 2 ===");

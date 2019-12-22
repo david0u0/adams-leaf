@@ -1,8 +1,8 @@
-use super::{time_and_tide::schedule_online, RoutingAlgo};
+use super::RoutingAlgo;
 use crate::flow::{AVBFlow, Flow, FlowEnum, FlowID, TSNFlow};
-use crate::graph_util::{Graph, MemorizingGraph, StreamAwareGraph};
+use crate::graph_util::StreamAwareGraph;
 use crate::network_wrapper::NetworkWrapper;
-use crate::recorder::{flow_table::prelude::*, GCL};
+use crate::recorder::flow_table::prelude::*;
 use crate::util::aco::ACO;
 use crate::util::YensAlgo;
 use crate::{MAX_K, T_LIMIT};
@@ -37,7 +37,7 @@ impl AdamsAnt {
 
         AdamsAnt {
             aco: ACO::new(0, MAX_K, None),
-            yens_algo: yens_algo.clone(),
+            yens_algo,
             compute_time: 0,
             wrapper,
         }
