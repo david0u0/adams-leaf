@@ -17,7 +17,7 @@ impl RoutingCost {
     pub fn compute(&self) -> f64 {
         let config = Config::get();
         let cost = self.compute_without_reroute_cost();
-        cost + config.w3 * self.reroute_overhead as f64 / (self.avb_cnt + self.tsn_cnt) as f64
+        cost + config.w2 * self.reroute_overhead as f64 / (self.avb_cnt + self.tsn_cnt) as f64
     }
     pub fn compute_without_reroute_cost(&self) -> f64 {
         let config = Config::get();
@@ -26,7 +26,7 @@ impl RoutingCost {
             cost += config.w0;
         }
         cost += config.w1 * self.avb_fail_cnt as f64 / self.avb_cnt as f64;
-        cost += config.w2 * self.avb_wcd / self.avb_cnt as f64;
+        cost += config.w3 * self.avb_wcd / self.avb_cnt as f64;
         cost
     }
 }

@@ -26,7 +26,7 @@ fn main() -> Result<(), String> {
     if algo_type == "aco" {
         println!("=== round 1 ===");
         let mut algo = AdamsAnt::new(g);
-        algo.add_flows_in_time(tsns1.clone(), avbs1.clone(), 1000 * 300);
+        algo.add_flows(tsns1.clone(), avbs1.clone());
         algo.show_results();
         println!("=== round 2 ===");
         algo.add_flows(tsns2.clone(), avbs2.clone());

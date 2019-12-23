@@ -9,9 +9,9 @@ pub struct Config {
     pub w0: f64,
     /// AVB 排程失敗的數量
     pub w1: f64,
-    /// AVB 的平均 Worst case delay
-    pub w2: f64,
     /// 重排路徑的成本
+    pub w2: f64,
+    /// AVB 的平均 Worst case delay
     pub w3: f64,
     /// 快速終止模式，看見第一組可行解即返回
     pub fast_stop: bool,
