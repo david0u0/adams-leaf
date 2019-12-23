@@ -3,9 +3,10 @@ use crate::flow::{AVBFlow, Flow, FlowEnum, FlowID, TSNFlow};
 use crate::graph_util::StreamAwareGraph;
 use crate::network_wrapper::NetworkWrapper;
 use crate::recorder::flow_table::prelude::*;
-use crate::util::aco::ACO;
-use crate::util::YensAlgo;
-use crate::{MAX_K, T_LIMIT};
+use crate::util::{aco::ACO, YensAlgo};
+use crate::config::Config;
+use crate::MAX_K;
+
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Instant;
@@ -50,7 +51,7 @@ impl AdamsAnt {
 impl RoutingAlgo for AdamsAnt {
     fn add_flows(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>) {
         let init_time = Instant::now();
-        self.add_flows_in_time(tsns, avbs, T_LIMIT);
+        self.add_flows_in_time(tsns, avbs, Config::get().t_limit);
         self.compute_time = init_time.elapsed().as_micros();
     }
     fn del_flows(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>) {
