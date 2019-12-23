@@ -15,10 +15,12 @@ pub struct Config {
     pub w3: f64,
     /// 快速終止模式，看見第一組可行解即返回
     pub fast_stop: bool,
-    // 計算能見度時，TSN 對舊路徑的偏好程度
+    /// 計算能見度時，TSN 對舊路徑的偏好程度
     pub tsn_memory: f64,
-    // 計算能見度時，AVB 對舊路徑的偏好程度
+    /// 計算能見度時，AVB 對舊路徑的偏好程度
     pub avb_memory: f64,
+    /// 演算法最多能執行的時間，以微秒計
+    pub t_limit: u128
 }
 
 impl Config {

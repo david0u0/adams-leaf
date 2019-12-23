@@ -5,7 +5,7 @@ use crate::graph_util::StreamAwareGraph;
 use crate::network_wrapper::{NetworkWrapper, RoutingCost};
 use crate::recorder::flow_table::prelude::*;
 use crate::util::YensAlgo;
-use crate::{MAX_K, T_LIMIT};
+use crate::MAX_K;
 use rand::Rng;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -53,7 +53,7 @@ impl RO {
     fn grasp(&mut self, time: Instant) {
         let mut iter_times = 0;
         let mut min_cost = self.wrapper.compute_all_cost();
-        while time.elapsed().as_micros() < T_LIMIT {
+        while time.elapsed().as_micros() < Config::get().t_limit {
             iter_times += 1;
             // PHASE 1
             let mut cur_wrapper = self.wrapper.clone();
@@ -109,7 +109,7 @@ impl RO {
         mut cur_wrapper: NetworkWrapper<usize>,
     ) {
         let mut iter_times = 0;
-        while time.elapsed().as_micros() < T_LIMIT {
+        while time.elapsed().as_micros() < Config::get().t_limit {
             let target_id: FlowID = rand::thread_rng()
                 .gen_range(0, cur_wrapper.get_flow_table().get_flow_cnt())
                 .into();
