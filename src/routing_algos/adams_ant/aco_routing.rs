@@ -1,6 +1,6 @@
 use super::AdamsAnt;
 use crate::config::Config;
-use crate::network_wrapper::RoutingCost;
+use crate::network_wrapper::{NetworkWrapper, RoutingCost};
 use crate::recorder::flow_table::prelude::*;
 use crate::util::aco::{ACOJudgeResult, ACO};
 use crate::MAX_K;
@@ -13,17 +13,17 @@ pub fn do_aco(algo: &mut AdamsAnt, time_limit: u128) {
     let vis = compute_visibility(algo);
 
     let mut best_dist = dist_computing(&algo.wrapper.compute_all_cost());
-    let new_state = unsafe {
-        (*aco).do_aco(time_limit - time.elapsed().as_micros(), &vis, |state| {
-            let (cost, dist) = compute_aco_dist(algo, state, &mut best_dist);
+    let mut_wrapper = &mut algo.wrapper;
+    algo.aco
+        .do_aco(time_limit - time.elapsed().as_micros(), &vis, |state| {
+            let (cost, dist) = compute_aco_dist(mut_wrapper, state, &mut best_dist);
             if cost.avb_fail_cnt == 0 && Config::get().fast_stop {
                 // 找到可行解，且為快速終止模式
                 ACOJudgeResult::Stop(dist)
             } else {
                 ACOJudgeResult::KeepOn(dist)
             }
-        })
-    };
+        });
 }
 
 fn compute_visibility(algo: &AdamsAnt) -> Vec<[f64; MAX_K]> {
@@ -58,13 +58,13 @@ fn compute_visibility(algo: &AdamsAnt) -> Vec<[f64; MAX_K]> {
     vis
 }
 
-/// 本函式不只會計算距離，如果看見最佳解，還會把該解的 FlowTable 和 GCL 記錄下來
-unsafe fn compute_aco_dist(
-    algo: &mut AdamsAnt,
+/// 本函式不只會計算距離，如果看見最佳解，還會把該解的網路包裝器
+fn compute_aco_dist(
+    wrapper: &mut NetworkWrapper<usize>,
     state: &Vec<usize>,
     best_dist: &mut f64,
 ) -> (RoutingCost, f64) {
-    let mut cur_wrapper = algo.wrapper.clone();
+    let mut cur_wrapper = wrapper.clone();
     let mut diff = cur_wrapper.get_flow_table().clone_as_diff();
 
     for (id, &route_k) in state.iter().enumerate() {
@@ -80,7 +80,7 @@ unsafe fn compute_aco_dist(
     if dist < *best_dist {
         *best_dist = dist;
         // 記錄 FlowTable 及 GCL
-        algo.wrapper = cur_wrapper;
+        *wrapper = cur_wrapper;
     }
 
     (cost, dist)
