@@ -7,7 +7,7 @@ use std::env;
 fn main() -> Result<(), String> {
     let (algo_type, topo_file_name, flow_file_name, flow_file_name2, times, config_name) = {
         let mut args: Vec<String> = env::args().collect();
-        let re = Regex::new(r"--config=([\w|\.]+)").unwrap();
+        let re = Regex::new(r"--config=([^ ]+)").unwrap();
         let mut config_name: Option<String> = None;
         for i in 0..args.len() {
             if let Some(cap) = re.captures(&args[i]) {
@@ -63,11 +63,11 @@ fn main() -> Result<(), String> {
         {
             println!("=== round 2 ===");
             algo.show_results();
+            println!(
+                "--- compute time: {} micro sec ---",
+                algo.get_last_compute_time()
+            );
         }
-        println!(
-            "--- compute time: {} micro sec ---",
-            algo.get_last_compute_time()
-        );
         cost_list.push(algo.get_cost());
     }
     RoutingCost::show_brief(cost_list);

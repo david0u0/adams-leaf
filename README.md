@@ -29,6 +29,14 @@ node test_case_generator.js # 測資將直接從標準輸出流噴出來
 ### evaluate.sh ###
 把指令集成為一個 bash 檔，方便操作，其實是可有可無的東西。
 
+### batch_eval.sh 和 eval_scripts/ ###
+`batch_eval.sh` 會執行 `eval_scripts/` 中的所有實驗腳本。此外，在編譯時會加上 `batch-eval` 旗標，避免輸出太多垃圾資訊
+
+### config.json 和 config.example.json ###
+`config.json` 是預設的設檔，不會放入版本控制。若程式找不到該檔案，則會去讀取 `config.example.json`。
+
+__任何修改參數的行為請改動 `config.json`，不要直接改範例檔！__
+
 ### 實驗結果 ###
 存放於 `exp_result/`，內含 Makefile，可以從數據生成優美的圖表。
 
