@@ -29,7 +29,45 @@ impl RoutingCost {
         cost += config.w3 * self.avb_wcd / self.avb_cnt as f64;
         cost
     }
+    pub fn show_brief(list: Vec<Self>) {
+        let mut all_avb_fail_cnt = 0;
+        let mut all_avb_wcd = 0.0;
+        let mut all_reroute_cnt = 0;
+        let mut all_cost = 0.0;
+        let times = list.len() as f64;
+        println!(
+            "{0: <10} {1: <10} {2: <10} {3: <20} total cost",
+            "", "#avb fail", "#reroute", "sum of wcd/deadline"
+        );
+        for (i, cost) in list.iter().enumerate() {
+            if cost.tsn_schedule_fail {
+                println!("#{}:\tTSN Schedule Fail!", i);
+            } else {
+                all_avb_fail_cnt += cost.avb_fail_cnt;
+                all_reroute_cnt += cost.reroute_overhead;
+                all_avb_wcd += cost.avb_wcd;
+                all_cost += cost.compute();
+                println!(
+                    "{0: <10} {1: <10} {2: <10} {3: <20} {4}",
+                    format!("test #{}", i),
+                    cost.avb_fail_cnt,
+                    cost.reroute_overhead,
+                    cost.avb_wcd,
+                    cost.compute()
+                );
+            }
+        }
+        println!(
+            "{0: <10} {1: <10} {2: <10} {3: <20} {4}",
+            "average:",
+            all_avb_fail_cnt as f64 / times,
+            all_reroute_cnt as f64 / times,
+            all_avb_wcd / times,
+            all_cost / times,
+        );
+    }
 }
+
 pub trait Calculator<T: Clone + Eq> {
     fn _compute_avb_wcd(&self, flow: &AVBFlow, route: Option<&T>) -> u32;
     fn _compute_single_avb_cost(&self, flow: &AVBFlow) -> RoutingCost;

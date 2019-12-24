@@ -1,10 +1,10 @@
 use super::RoutingAlgo;
+use crate::config::Config;
 use crate::flow::{AVBFlow, Flow, FlowEnum, FlowID, TSNFlow};
 use crate::graph_util::StreamAwareGraph;
-use crate::network_wrapper::NetworkWrapper;
+use crate::network_wrapper::{NetworkWrapper, RoutingCost};
 use crate::recorder::flow_table::prelude::*;
 use crate::util::{aco::ACO, YensAlgo};
-use crate::config::Config;
 use crate::MAX_K;
 
 use std::cell::RefCell;
@@ -84,6 +84,9 @@ impl RoutingAlgo for AdamsAnt {
     }
     fn get_last_compute_time(&self) -> u128 {
         self.compute_time
+    }
+    fn get_cost(&self) -> RoutingCost {
+        self.wrapper.compute_all_cost()
     }
 }
 

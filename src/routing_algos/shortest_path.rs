@@ -1,7 +1,7 @@
 use super::RoutingAlgo;
 use crate::flow::{AVBFlow, Flow, FlowID, TSNFlow};
 use crate::graph_util::StreamAwareGraph;
-use crate::network_wrapper::NetworkWrapper;
+use crate::network_wrapper::{NetworkWrapper, RoutingCost};
 use crate::recorder::flow_table::prelude::*;
 use crate::util::Dijkstra;
 
@@ -61,6 +61,9 @@ impl RoutingAlgo for SPF {
         let all_cost = self.wrapper.compute_all_cost();
         println!("the cost structure = {:?}", all_cost,);
         println!("{}", all_cost.compute());
+    }
+    fn get_cost(&self) -> RoutingCost {
+        self.wrapper.compute_all_cost()
     }
 }
 

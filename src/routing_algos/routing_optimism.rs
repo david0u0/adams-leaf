@@ -211,4 +211,7 @@ impl RoutingAlgo for RO {
     fn get_last_compute_time(&self) -> u128 {
         self.compute_time
     }
+    fn get_cost(&self) -> RoutingCost {
+        self.wrapper.compute_all_cost()
+    }
 }
