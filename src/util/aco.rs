@@ -164,7 +164,7 @@ impl ACO {
                 break;
             }
             #[cfg(debug_assertions)]
-            println!("{:?}", self.pheromone);
+            println!("pheromone = {:?}", self.pheromone);
         }
         #[cfg(debug_assertions)]
         println!("ACO epoch = {}", epoch);

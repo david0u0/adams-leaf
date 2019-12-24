@@ -70,9 +70,11 @@ impl RO {
             let cost = cur_wrapper.compute_all_cost();
             if cost.compute_without_reroute_cost() < min_cost.compute_without_reroute_cost() {
                 min_cost = cost;
+                #[cfg(debug_assertions)]
                 println!("found min_cost = {:?} at first glance!", cost);
             }
 
+            #[cfg(debug_assertions)]
             println!("start iteration #{}", iter_times);
             self.hill_climbing(&time, &mut min_cost, cur_wrapper);
             if min_cost.avb_fail_cnt == 0 && Config::get().fast_stop {
@@ -141,6 +143,8 @@ impl RO {
                 self.wrapper = cur_wrapper.clone();
                 *min_cost = cost.clone();
                 iter_times = 0;
+
+                #[cfg(debug_assertions)]
                 println!("found min_cost = {:?}", cost);
 
                 if cost.avb_fail_cnt == 0 && Config::get().fast_stop {

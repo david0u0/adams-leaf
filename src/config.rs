@@ -26,16 +26,28 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load() -> Self {
-        let txt = fs::read_to_string("config.json")
-            .unwrap_or_else(|_| fs::read_to_string("config.example.json").unwrap());
-        let config: Config = serde_json::from_str(&txt).expect(&format!("無法設定檔"));
-        config
+    pub fn load_file(file_name: &str) -> Result<(), String> {
+        let txt = fs::read_to_string(file_name).or(Err(format!("讀檔失敗： {}", file_name)))?;
+        let config: Config =
+            serde_json::from_str(&txt).expect(&format!("無法解析設定檔： {}", file_name));
+        unsafe {
+            if CONFIG.is_none() {
+                CONFIG = Some(config);
+            } else {
+                panic!("重複讀取設定檔！");
+            }
+        }
+        Ok(())
+    }
+    fn load_default() {
+        Self::load_file("config.json")
+            .or_else(|_| Self::load_file("config.example.json"))
+            .unwrap();
     }
     pub fn get() -> &'static Self {
         unsafe {
             if CONFIG.is_none() {
-                CONFIG = Some(Config::load());
+                Self::load_default();
             }
             CONFIG.as_ref().unwrap()
         }
