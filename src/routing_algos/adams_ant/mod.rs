@@ -50,8 +50,26 @@ impl AdamsAnt {
 
 impl RoutingAlgo for AdamsAnt {
     fn add_flows(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>) {
+        for flow in tsns.iter() {
+            self.yens_algo
+                .borrow_mut()
+                .compute_routes(flow.src, flow.dst);
+        }
+        for flow in avbs.iter() {
+            self.yens_algo
+                .borrow_mut()
+                .compute_routes(flow.src, flow.dst);
+        }
         let init_time = Instant::now();
-        self.add_flows_in_time(tsns, avbs, Config::get().t_limit);
+        self.wrapper.insert(tsns, avbs, 0);
+
+        self.aco
+            .extend_state_len(self.wrapper.get_flow_table().get_max_id().0 + 1);
+
+        do_aco(
+            self,
+            Config::get().t_limit - init_time.elapsed().as_micros(),
+        );
         self.compute_time = init_time.elapsed().as_micros();
     }
     fn del_flows(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>) {
@@ -87,26 +105,5 @@ impl RoutingAlgo for AdamsAnt {
     }
     fn get_cost(&self) -> RoutingCost {
         self.wrapper.compute_all_cost()
-    }
-}
-
-impl AdamsAnt {
-    pub fn add_flows_in_time(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>, t_limit: u128) {
-        for flow in tsns.iter() {
-            self.yens_algo
-                .borrow_mut()
-                .compute_routes(flow.src, flow.dst);
-        }
-        for flow in avbs.iter() {
-            self.yens_algo
-                .borrow_mut()
-                .compute_routes(flow.src, flow.dst);
-        }
-        self.wrapper.insert(tsns, avbs, 0);
-
-        self.aco
-            .extend_state_len(self.wrapper.get_flow_table().get_max_id().0 + 1);
-
-        do_aco(self, t_limit);
     }
 }
