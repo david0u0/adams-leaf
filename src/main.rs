@@ -1,6 +1,6 @@
 use adams_leaf::network_wrapper::RoutingCost;
 use adams_leaf::routing_algos::{AdamsAnt, RoutingAlgo, RO, SPF};
-use adams_leaf::{config, read_flows_from_file, read_topo_from_file};
+use adams_leaf::{config::Config, read_flows_from_file, read_topo_from_file};
 use regex::Regex;
 use std::env;
 
@@ -31,7 +31,7 @@ fn main() -> Result<(), String> {
     };
     if let Some(config_name) = config_name {
         println!("{}", config_name);
-        config::Config::load_file(&config_name).unwrap();
+        Config::load_file(&config_name).unwrap();
     }
 
     let (tsns1, avbs1) = read_flows_from_file(&flow_file_name, 1);
@@ -40,7 +40,8 @@ fn main() -> Result<(), String> {
     // FIXME 對這個圖作 Yens algo，0->2這條路有時找得到6條，有時只找得到5條
 
     let mut cost_list = Vec::<RoutingCost>::new();
-    for _ in 0..config::Config::get().exp_times {
+    let mut sum_comp_time = 0;
+    for _ in 0..Config::get().exp_times {
         let mut algo: Box<dyn RoutingAlgo> = {
             if algo_type == "aco" {
                 Box::new(AdamsAnt::new(g.clone()))
@@ -69,7 +70,12 @@ fn main() -> Result<(), String> {
             );
         }
         cost_list.push(algo.get_cost());
+        sum_comp_time += algo.get_last_compute_time();
     }
     RoutingCost::show_brief(cost_list);
+    println!(
+        "avg computing time: {} microsecond",
+        sum_comp_time as f64 / Config::get().exp_times as f64
+    );
     Ok(())
 }

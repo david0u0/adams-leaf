@@ -112,6 +112,10 @@ impl RO {
     ) {
         let mut iter_times = 0;
         while time.elapsed().as_micros() < Config::get().t_limit {
+            if min_cost.avb_fail_cnt == 0 && Config::get().fast_stop {
+                return; // 找到可行解，返回
+            }
+
             let target_id: FlowID = rand::thread_rng()
                 .gen_range(0, cur_wrapper.get_flow_table().get_flow_cnt())
                 .into();
@@ -138,7 +142,6 @@ impl RO {
                 cur_wrapper.update_single_avb(target_flow, new_route);
                 cur_wrapper.compute_all_cost()
             };
-
             if cost.compute_without_reroute_cost() < min_cost.compute_without_reroute_cost() {
                 self.wrapper = cur_wrapper.clone();
                 *min_cost = cost.clone();
@@ -146,10 +149,6 @@ impl RO {
 
                 #[cfg(debug_assertions)]
                 println!("found min_cost = {:?}", cost);
-
-                if cost.avb_fail_cnt == 0 && Config::get().fast_stop {
-                    return; // 找到可行解，返回
-                }
             } else {
                 // 恢復上一動
                 cur_wrapper.update_single_avb(target_flow, old_route);
@@ -177,8 +176,8 @@ impl RoutingAlgo for RO {
                 .borrow_mut()
                 .compute_routes(flow.src, flow.dst);
         }
-        self.wrapper.insert(tsns, avbs, 0);
         let init_time = Instant::now();
+        self.wrapper.insert(tsns, avbs, 0);
 
         self.grasp(init_time);
 
