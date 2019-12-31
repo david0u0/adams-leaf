@@ -3,4 +3,6 @@ target/*
 *.swp
 
 .plot.lock
-plot/
+plot/log/
+plot/*.dat
+plot/*.png

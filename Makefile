@@ -1,11 +1,12 @@
 .PHONY: start clean
 
 
-PARALLEL := parallel -j1
+PARALLEL := parallel -j2
 CARGO := cargo
 
 LOG  = $(wildcard plot/log/*.log)
 DAT  = plot/fig-5-1.dat plot/fig-5-2.dat plot/fig-5-3.dat
+PNG  = $(DAT:%.dat=%.png)
 LOCK = .plot.lock
 
 FOLD   := 1 2 3 4 5 6 7
@@ -14,23 +15,23 @@ MEMORY := 1 2 3 4 5 6 7
 
 all: start
 
-start: $(DAT)
-	cp plot/fig-5-1.dat exp_result/不同演算法之效能比較1.dat
-	cp plot/fig-5-2.dat exp_result/不同演算法之效能比較2.dat
-	cp plot/fig-5-3.dat exp_result/ACO記憶性對效能比較.dat
-	make -C exp_result/
+start: $(PNG)
+
+
+plot/%.png: plot/%.gpi plot/%.dat
+	gnuplot $< > $@
 
 plot/fig-5-1.dat: $(LOCK)
 	(seq -s ' ' 10 10 70; \
-	 echo $(foreach f,$(FOLD),plot/log/ro-light-$(f)-3.log) \
+	 echo $(foreach f,$(FOLD),plot/log/ro-mid-$(f)-3.log) \
 		| xargs sed -n '/compute time/s|[^0-9]||gp' - \
 		| pr -7 -t \
 		| datamash -W mean 1-7; \
-	 echo $(foreach f,$(FOLD),plot/log/aco-light-$(f)-3.log) \
+	 echo $(foreach f,$(FOLD),plot/log/aco-mid-$(f)-3.log) \
 		| xargs sed -n '/compute time/s|[^0-9]||gp' - \
 		| pr -7 -t \
 		| datamash -W mean 1-7; \
-	 echo $(foreach f,$(FOLD),plot/log/aco-light-$(f)-inf.log) \
+	 echo $(foreach f,$(FOLD),plot/log/aco-mid-$(f)-inf.log) \
 		| xargs sed -n '/compute time/s|[^0-9]||gp' - \
 		| pr -7 -t \
 		| datamash -W mean 1-7;) \
@@ -67,7 +68,7 @@ $(LOCK):
 		exp_graph.json exp_flow_{2}.json exp_flow_reconf.json \
 		{3} --config=config.{4}.json \
 		'>' plot/log/{1}-{2}-{3}-{4}.log \
-		::: aco ro ::: light heavy ::: $(FOLD) ::: 3 inf
+		::: aco ro ::: mid heavy ::: $(FOLD) ::: 3 inf
 	# for figure 5.3
 	$(PARALLEL) $(CARGO) run -- {1} \
 		exp_graph.json exp_flow_{2}.json exp_flow_reconf.json \
@@ -77,4 +78,4 @@ $(LOCK):
 	touch $@
 
 clean:
-	$(RM) $(LOG) $(DAT) $(LOCK)
+	$(RM) $(LOG) $(DAT) $(PNG) $(LOCK)
