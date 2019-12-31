@@ -1,4 +1,6 @@
 target/*
 .vscode
 *.swp
-config.json
+
+.plot.lock
+plot/
