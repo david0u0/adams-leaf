@@ -1,8 +1,9 @@
 .PHONY: start clean
 
 
-PARALLEL := parallel -j2
+PARALLEL := parallel -j2 --tag --lb
 CARGO := cargo
+MAIN := target/release/adams_leaf
 
 LOG  = $(wildcard plot/log/*.log)
 DAT  = plot/fig-5-1.dat plot/fig-5-2.dat plot/fig-5-3.dat
@@ -64,13 +65,13 @@ plot/fig-5-3.dat: $(LOCK)
 $(LOCK):
 	mkdir -p plot/log/
 	# for figure 5.1 and 5.2
-	$(PARALLEL) $(CARGO) run -- {1} \
+	$(PARALLEL) $(MAIN) {1} \
 		exp_graph.json exp_flow_{2}.json exp_flow_reconf.json \
 		{3} --config=config.{4}.json \
 		'>' plot/log/{1}-{2}-{3}-{4}.log \
 		::: aco ro ::: mid heavy ::: $(FOLD) ::: 3 inf
 	# for figure 5.3
-	$(PARALLEL) $(CARGO) run -- {1} \
+	$(PARALLEL) $(MAIN) {1} \
 		exp_graph.json exp_flow_{2}.json exp_flow_reconf.json \
 		{3} --config=config.{4}.json \
 		'>' plot/log/{1}-{2}-{3}-{4}.log \
