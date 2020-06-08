@@ -14,6 +14,14 @@ FOLD   := 1 2 3 4 5 6 7
 MEMORY := 1 2 3 4 5 6 7
 
 
+all: start
+
+start: $(PNG)
+
+clean:
+	$(RM) $(LOG) $(DAT) $(PNG) $(LOCK)
+
+
 $(MAIN):
 	cargo build --release
 
@@ -47,21 +55,13 @@ $(LOCK): $(MAIN)
 	# for figure 5.1 and 5.2
 	$(PARALLEL) $(MAIN) {1} \
 		exp_graph.json exp_flow_{2}.json exp_flow_reconf.json \
-		{3} --config=config.{4}.json \
+		{3} --config=assets/confs/config.{4}.json \
 		'>' plot/log/{1}-{2}-{3}-{4}.log \
 		::: spf aco ro ::: mid heavy ::: $(FOLD) ::: 3 inf
 	# for figure 5.3
 	$(PARALLEL) $(MAIN) {1} \
 		exp_graph.json exp_flow_{2}.json exp_flow_reconf.json \
-		{3} --config=config.{4}.json \
+		{3} --config=assets/confs/config.{4}.json \
 		'>' plot/log/{1}-{2}-{3}-{4}.log \
 		::: aco ::: heavy ::: 4 ::: $(MEMORY)
 	touch $@
-
-
-all: start
-
-start: $(PNG)
-
-clean:
-	$(RM) $(LOG) $(DAT) $(PNG) $(LOCK)
