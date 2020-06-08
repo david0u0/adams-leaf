@@ -4,25 +4,31 @@ use crate::graph_util::StreamAwareGraph;
 use crate::network_wrapper::{NetworkWrapper, RoutingCost};
 use crate::recorder::flow_table::prelude::*;
 use crate::util::Dijkstra;
+use std::time::Instant;
 
 pub struct SPF {
     wrapper: NetworkWrapper<Vec<usize>>,
     dijkstra_algo: Dijkstra<usize, StreamAwareGraph>,
+    compute_time: u128,
 }
 
 impl SPF {
     pub fn new(g: StreamAwareGraph) -> Self {
         let wrapper = NetworkWrapper::new(g.clone(), move |_, route| route as *const Vec<usize>);
+        let init_time = Instant::now();
+        let dijkstra_algo = Dijkstra::new(g);
+        let compute_time = init_time.elapsed().as_micros();
         SPF {
             wrapper,
-            dijkstra_algo: Dijkstra::new(g),
+            compute_time,
+            dijkstra_algo,
         }
     }
 }
 
 impl RoutingAlgo for SPF {
     fn get_last_compute_time(&self) -> u128 {
-        unimplemented!();
+        self.compute_time
     }
     fn add_flows(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>) {
         for flow in tsns.into_iter() {
