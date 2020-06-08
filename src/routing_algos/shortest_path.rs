@@ -14,14 +14,11 @@ pub struct SPF {
 
 impl SPF {
     pub fn new(g: StreamAwareGraph) -> Self {
-        let wrapper = NetworkWrapper::new(g.clone(), move |_, route| route as *const Vec<usize>);
-        let init_time = Instant::now();
-        let dijkstra_algo = Dijkstra::new(g);
-        let compute_time = init_time.elapsed().as_micros();
+        let wrapper = NetworkWrapper::new(g.clone(), |_, route| route as *const Vec<usize>);
         SPF {
             wrapper,
-            compute_time,
-            dijkstra_algo,
+            compute_time: 0,
+            dijkstra_algo: Dijkstra::new(g),
         }
     }
 }
@@ -31,6 +28,7 @@ impl RoutingAlgo for SPF {
         self.compute_time
     }
     fn add_flows(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>) {
+        let init_time = Instant::now();
         for flow in tsns.into_iter() {
             let route = self.get_shortest_route(&flow);
             self.wrapper.insert(vec![flow], vec![], route);
@@ -39,6 +37,7 @@ impl RoutingAlgo for SPF {
             let route = self.get_shortest_route(&flow);
             self.wrapper.insert(vec![], vec![flow], route);
         }
+        self.compute_time = init_time.elapsed().as_micros();
     }
     fn del_flows(&mut self, tsns: Vec<TSNFlow>, avbs: Vec<AVBFlow>) {
         unimplemented!();
