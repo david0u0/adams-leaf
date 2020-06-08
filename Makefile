@@ -22,6 +22,7 @@ plot/%.png: plot/%.gpi plot/%.dat
 
 plot/fig-5-1.dat: $(LOCK)
 	(seq -s ' ' 10 10 70; \
+	 utils/stat.sh $(foreach f,$(FOLD),plot/log/spf-mid-$(f)-3.log);   \
 	 utils/stat.sh $(foreach f,$(FOLD),plot/log/ro-mid-$(f)-3.log);    \
 	 utils/stat.sh $(foreach f,$(FOLD),plot/log/aco-mid-$(f)-3.log);   \
 	 utils/stat.sh $(foreach f,$(FOLD),plot/log/aco-mid-$(f)-inf.log); \
@@ -29,6 +30,7 @@ plot/fig-5-1.dat: $(LOCK)
 
 plot/fig-5-2.dat: $(LOCK)
 	(seq -s ' ' 10 10 70; \
+	 utils/stat.sh $(foreach f,$(FOLD),plot/log/spf-heavy-$(f)-3.log);   \
 	 utils/stat.sh $(foreach f,$(FOLD),plot/log/ro-heavy-$(f)-3.log);    \
 	 utils/stat.sh $(foreach f,$(FOLD),plot/log/aco-heavy-$(f)-3.log);   \
 	 utils/stat.sh $(foreach f,$(FOLD),plot/log/aco-heavy-$(f)-inf.log); \
@@ -47,7 +49,7 @@ $(LOCK): $(MAIN)
 		exp_graph.json exp_flow_{2}.json exp_flow_reconf.json \
 		{3} --config=config.{4}.json \
 		'>' plot/log/{1}-{2}-{3}-{4}.log \
-		::: aco ro ::: mid heavy ::: $(FOLD) ::: 3 inf
+		::: spf aco ro ::: mid heavy ::: $(FOLD) ::: 3 inf
 	# for figure 5.3
 	$(PARALLEL) $(MAIN) {1} \
 		exp_graph.json exp_flow_{2}.json exp_flow_reconf.json \
