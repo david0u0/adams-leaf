@@ -1,4 +1,8 @@
 target/*
 .vscode
 *.swp
-config.json
+
+.plot.lock
+plot/log/
+plot/*.dat
+plot/*.png
