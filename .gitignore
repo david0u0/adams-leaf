@@ -6,3 +6,5 @@ target/*
 plot/log/
 plot/*.dat
 plot/*.png
+
+config.json
