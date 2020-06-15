@@ -25,14 +25,14 @@ pub struct NetworkWrapper<T: Clone + Eq> {
 }
 
 impl<T: Clone + Eq> NetworkWrapper<T> {
-    pub fn new<F>(graph: StreamAwareGraph, get_route_func: F) -> Self
+    pub fn new<F>(hyper_p: u32, graph: StreamAwareGraph, get_route_func: F) -> Self
     where
         F: 'static + Fn(&FlowEnum, &T) -> *const Route,
     {
         NetworkWrapper {
             flow_table: FlowTable::new(),
             old_new_table: None,
-            gcl: GCL::new(1, graph.get_edge_cnt()),
+            gcl: GCL::new(hyper_p, graph.get_edge_cnt()),
             tsn_fail: false,
             graph: MemorizingGraph::new(graph),
             get_route_func: Rc::new(get_route_func),
@@ -167,7 +167,7 @@ mod test {
     fn init() -> (NetworkWrapper<usize>, Vec<TSNFlow>) {
         let graph = read_topo_from_file("test_graph.json");
         let env = Env::new();
-        let wrapper = NetworkWrapper::new(graph, move |flow, k: &usize| match flow {
+        let wrapper = NetworkWrapper::new(600, graph, move |flow, k: &usize| match flow {
             FlowEnum::AVB(flow) => env.get_route(flow.src, flow.dst, *k),
             FlowEnum::TSN(flow) => env.get_route(flow.src, flow.dst, *k),
         });

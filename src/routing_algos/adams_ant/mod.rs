@@ -31,7 +31,8 @@ impl AdamsAnt {
     pub fn new(g: StreamAwareGraph) -> Self {
         let yens_algo = Rc::new(RefCell::new(YensAlgo::new(g.clone(), MAX_K)));
         let tmp_yens = yens_algo.clone();
-        let wrapper = NetworkWrapper::new(g, move |flow_enum, &k| {
+        // TODO: 計算 hyper_p
+        let wrapper = NetworkWrapper::new(1000, g, move |flow_enum, &k| {
             let (src, dst) = get_src_dst(flow_enum);
             tmp_yens.borrow().get_kth_route(src, dst, k) as *const Vec<usize>
         });

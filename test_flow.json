@@ -4,8 +4,8 @@
             "src": 4,
             "dst": 2,
             "size": 2000,
-            "period": 10,
-            "max_delay": 100,
+            "period": 20,
+            "max_delay": 20,
             "offset": 20
         }
     ],

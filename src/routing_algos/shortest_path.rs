@@ -14,7 +14,8 @@ pub struct SPF {
 
 impl SPF {
     pub fn new(g: StreamAwareGraph) -> Self {
-        let wrapper = NetworkWrapper::new(g.clone(), |_, route| route as *const Vec<usize>);
+        // TODO: 計算 hyper_p
+        let wrapper = NetworkWrapper::new(1000, g.clone(), |_, route| route as *const Vec<usize>);
         SPF {
             wrapper,
             compute_time: 0,
