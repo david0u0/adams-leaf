@@ -65,11 +65,11 @@ pub fn schedule_online<T: Eq + Clone, F: Fn(&TSNFlow, &T) -> Links>(
     gcl: &mut GCL,
     get_links: F,
 ) -> Result<bool, ()> {
-    let result = schedule_fixed_og(changed_table, gcl, |f, t| get_links(f, t));
+    let result = schedule_fixed_og(changed_table, gcl, &get_links);
     og_table.apply_diff(true, changed_table);
     if !result.is_ok() {
         gcl.clear();
-        schedule_fixed_og(og_table, gcl, |f, t| get_links(f, t))?;
+        schedule_fixed_og(og_table, gcl, &get_links)?;
         Ok(true)
     } else {
         Ok(false)
@@ -86,7 +86,7 @@ fn schedule_fixed_og<T: Eq + Clone, TABLE: IFlowTable<INFO = T>, F: Fn(&TSNFlow,
     for (flow, _) in table.iter_tsn() {
         tsn_ids.push(flow.id);
     }
-    tsn_ids.sort_by(|&id1, &id2| cmp_flow(id1, id2, table, |f, t| get_links(f, t)));
+    tsn_ids.sort_by(|&id1, &id2| cmp_flow(id1, id2, table, &get_links));
     for flow_id in tsn_ids.into_iter() {
         let flow = table.get_tsn(flow_id).unwrap();
         let links = get_links(flow, table.get_info(flow_id).unwrap());
